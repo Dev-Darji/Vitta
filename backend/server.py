@@ -78,6 +78,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+api_router = APIRouter(prefix="/api")
+
 @api_router.get("/health")
 async def health_check():
     return {"status": "healthy", "environment": "production" if "render" in str(os.environ.get("HOSTNAME", "")) else "local"}
