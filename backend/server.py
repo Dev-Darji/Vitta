@@ -10,10 +10,14 @@ from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone, timedelta
+# --- FIX FOR PASSLIB/BCRYPT COMPATIBILITY ---
 import bcrypt
-# Fix for passlib compatibility with newer bcrypt versions
+# Some versions of passlib look for __about__.__version__ which is missing in bcrypt 4.x
 if not hasattr(bcrypt, "__about__"):
-    bcrypt.__about__ = type('About', (), {'__version__': bcrypt.__version__})
+    class About:
+        __version__ = getattr(bcrypt, "__version__", "4.0.0")
+    bcrypt.__about__ = About()
+# ------------------------------------------
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 import pandas as pd
@@ -773,9 +777,11 @@ async def get_monthly_trend(current_user: User = Depends(get_current_user)):
 
 # Add CORS middleware BEFORE including the router
 # Parse CORS origins from environment variable
-cors_origins_str = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://localhost:3001,https://vittora.netlify.app,https://vitta-theta.vercel.app')
-# Also allow any subdomains of netlify.app for convenience during renaming
-allowed_origins = [origin.strip() for origin in cors_origins_str.split(',')]
+cors_origins_str = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://localhost:3001,https://vitta-theta.vercel.app')
+allowed_origins = [origin.strip() for origin in cors_origins_str.split(',') if origin.strip()]
+# Ensure we always allow the main prod domain even if ENV is messy
+if "https://vitta-theta.vercel.app" not in allowed_origins:
+    allowed_origins.append("https://vitta-theta.vercel.app")
 
 app.add_middleware(
     CORSMiddleware,
