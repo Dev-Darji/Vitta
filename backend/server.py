@@ -35,21 +35,54 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Clean environment variables (Render sometimes adds quotes)
+def get_env(key, default=None):
+    val = os.environ.get(key, default)
+    if val and isinstance(val, str):
+        return val.strip("'\"")
+    return val
+
 # MongoDB connection with timeout
-mongo_url = os.environ['MONGO_URL']
+mongo_url = get_env('MONGO_URL')
+if not mongo_url:
+    logger.error("MONGO_URL not found in environment!")
+    # Fallback to a dummy if missing to prevent startup crash, but it will fail on use
+    mongo_url = "mongodb://localhost:27017"
+
 client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
-db = client[os.environ['DB_NAME']]
+db = client[get_env('DB_NAME', 'vitta_database')]
 
 # Security
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
-SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key-change-in-production")
+SECRET_KEY = get_env("SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 # Create the main app without a prefix
 app = FastAPI()
+
+# Add CORS middleware IMMEDIATELY after creating app to ensure it wraps everything
+cors_origins_str = get_env('CORS_ORIGINS', 'http://localhost:3000,https://vitta-theta.vercel.app')
+allowed_origins = [origin.strip() for origin in cors_origins_str.split(',') if origin.strip()]
+extra_origins = ["https://vitta-theta.vercel.app", "http://localhost:3000"]
+for origin in extra_origins:
+    if origin not in allowed_origins:
+        allowed_origins.append(origin)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 api_router = APIRouter(prefix="/api")
+
+@api_router.get("/health")
+async def health_check():
+    return {"status": "healthy", "environment": "production" if "render" in str(os.environ.get("HOSTNAME", "")) else "local"}
 
 @app.get("/")
 async def root():
@@ -807,9 +840,12 @@ app.add_middleware(
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     import traceback
-    # Use the logger defined at the top
-    logger.error(f"Global exception: {exc}\n{traceback.format_exc()}")
-    return HTTPException(status_code=500, detail=str(exc))
+    error_msg = f"Global exception: {exc}\n{traceback.format_exc()}"
+    logger.error(error_msg)
+    return HTTPException(
+        status_code=500, 
+        detail=f"Internal Server Error: {str(exc)}. Please check Render logs for full traceback."
+    )
 
 # Include the router in the main app
 app.include_router(api_router)
