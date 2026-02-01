@@ -769,7 +769,7 @@ async def get_monthly_trend(current_user: User = Depends(get_current_user)):
 
 # Add CORS middleware BEFORE including the router
 # Parse CORS origins from environment variable
-cors_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000')
+cors_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,https://superlative-jelly-e531fc.netlify.app')
 allowed_origins = [origin.strip() for origin in cors_origins.split(',')]
 
 app.add_middleware(
