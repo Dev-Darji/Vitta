@@ -10,6 +10,10 @@ from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone, timedelta
+import bcrypt
+# Fix for passlib compatibility with newer bcrypt versions
+if not hasattr(bcrypt, "__about__"):
+    bcrypt.__about__ = type('About', (), {'__version__': bcrypt.__version__})
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 import pandas as pd
