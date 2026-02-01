@@ -779,9 +779,20 @@ async def get_monthly_trend(current_user: User = Depends(get_current_user)):
 # Parse CORS origins from environment variable
 cors_origins_str = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://localhost:3001,https://vitta-theta.vercel.app')
 allowed_origins = [origin.strip() for origin in cors_origins_str.split(',') if origin.strip()]
-# Ensure we always allow the main prod domain even if ENV is messy
-if "https://vitta-theta.vercel.app" not in allowed_origins:
-    allowed_origins.append("https://vitta-theta.vercel.app")
+
+# Add variations of the Vercel URL just in case
+extra_origins = [
+    "https://vitta-theta.vercel.app",
+    "https://vitta-theta.vercel.app/",
+    "http://vitta-theta.vercel.app",
+    "http://vitta-theta.vercel.app/"
+]
+for origin in extra_origins:
+    if origin not in allowed_origins:
+        allowed_origins.append(origin)
+
+print(f"DEBUG: Allowed CORS Origins: {allowed_origins}")
+logger.info(f"CORS initialized with origins: {allowed_origins}")
 
 app.add_middleware(
     CORSMiddleware,
