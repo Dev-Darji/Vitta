@@ -66,6 +66,7 @@ const Login = () => {
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    autoComplete="email"
                     className="h-14 rounded-2xl bg-slate-50 border-slate-100 focus:bg-white transition-all px-6"
                     placeholder="name@company.com"
                   />
@@ -86,6 +87,7 @@ const Login = () => {
                       required
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      autoComplete="current-password"
                       className="h-14 rounded-2xl bg-slate-50 border-slate-100 focus:bg-white transition-all px-6"
                       placeholder="••••••••"
                     />

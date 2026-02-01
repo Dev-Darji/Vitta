@@ -103,6 +103,7 @@ const Signup = () => {
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    autoComplete="name"
                     className="h-12 rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all px-5"
                     placeholder="John Doe"
                   />
@@ -117,6 +118,7 @@ const Signup = () => {
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    autoComplete="email"
                     className="h-12 rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all px-5"
                     placeholder="name@company.com"
                   />
@@ -133,6 +135,7 @@ const Signup = () => {
                         required
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        autoComplete="new-password"
                         className="h-12 rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all px-5"
                         placeholder="••••••••"
                       />
@@ -156,6 +159,7 @@ const Signup = () => {
                         required
                         value={formData.confirmPassword}
                         onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                        autoComplete="new-password"
                         className="h-12 rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all px-5"
                         placeholder="••••••••"
                       />
