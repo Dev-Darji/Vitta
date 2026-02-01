@@ -1,0 +1,163 @@
+{
+  "brand_identity": {
+    "name": "Vitta",
+    "mission": "Simplify accounting for Indian SMBs with a modern, automated, and friendly interface.",
+    "tone": "Professional, Trustworthy, Efficient, Approachable, Modern.",
+    "archetype": "Organic & Earthy (Trust/Growth) mixed with Soft Utility.",
+    "theme_mode": "light"
+  },
+  "typography": {
+    "font_family": {
+      "headings": "Manrope, sans-serif",
+      "body": "DM Sans, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "import_url": "https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,100..1000&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@200..800&display=swap",
+    "usage_rules": {
+      "headings": "Use Manrope. Weights: SemiBold (600) or Bold (700) for main titles. ExtraBold (800) for hero. Letter-spacing: tight (-0.02em).",
+      "body": "Use DM Sans. Weights: Regular (400) for text, Medium (500) for labels. Relaxed line-height (1.6).",
+      "overline": "Uppercase, tracking-widest (0.2em), text-xs, font-bold."
+    }
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "DEFAULT": "#0F392B",
+        "foreground": "#FFFFFF",
+        "description": "Deep Emerald - The anchor. Use for primary buttons, active states, and strong headings."
+      },
+      "secondary": {
+        "DEFAULT": "#F2F5F3",
+        "foreground": "#0F392B",
+        "description": "Pale Sage/Mint White - Main background color to avoid sterile white."
+      },
+      "accent": {
+        "DEFAULT": "#C8E947",
+        "foreground": "#0F392B",
+        "description": "Electric Lime - High energy pop. Use for CTAs, success states, and highlights."
+      },
+      "muted": {
+        "DEFAULT": "#F1F5F9",
+        "foreground": "#64748B",
+        "description": "Slate 100 - For card backgrounds and secondary areas."
+      },
+      "border": {
+        "DEFAULT": "#E2E8F0",
+        "description": "Slate 200 - Subtle borders."
+      },
+      "background": {
+        "DEFAULT": "#FFFFFF",
+        "alt": "#F8FAFC"
+      },
+      "foreground": {
+        "DEFAULT": "#0F172A",
+        "muted": "#475569"
+      }
+    },
+    "gradients": {
+      "hero_glow": "radial-gradient(circle at 50% 50%, rgba(200, 233, 71, 0.15) 0%, rgba(255, 255, 255, 0) 70%)",
+      "card_hover": "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(200, 233, 71, 0.05) 100%)"
+    }
+  },
+  "visual_enhancers": {
+    "radius": {
+      "default": "0.75rem",
+      "lg": "1rem",
+      "xl": "1.5rem",
+      "full": "9999px"
+    },
+    "shadows": {
+      "card": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+      "card_hover": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+      "float": "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)"
+    },
+    "glassmorphism": {
+      "header": "bg-white/80 backdrop-blur-md border-b border-slate-200/50",
+      "overlay": "bg-black/20 backdrop-blur-sm"
+    },
+    "textures": {
+      "noise": "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E\")"
+    }
+  },
+  "layout_strategies": {
+    "marketing": {
+      "grid": "Mode A: Tetris Grid. Asymmetric, overlapping elements. Use col-span-full md:col-span-8 for hero visuals.",
+      "spacing": "Generous. py-20 or py-32 for sections. gap-8 or gap-12 for grids.",
+      "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+    },
+    "dashboard": {
+      "grid": "Mode B: High Density Bento. grid-cols-1 md:grid-cols-3 lg:grid-cols-4. Gap-4 or Gap-6.",
+      "card_style": "bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-200",
+      "sidebar": "Fixed width (240px or 280px), border-r border-slate-200, bg-slate-50/50."
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#0F392B] text-white hover:bg-[#0F392B]/90 shadow-lg shadow-[#0F392B]/20 rounded-full px-8 py-3 font-medium transition-transform active:scale-95",
+      "secondary": "bg-white text-[#0F392B] border border-[#E2E8F0] hover:bg-[#F2F5F3] rounded-full px-8 py-3 font-medium",
+      "accent": "bg-[#C8E947] text-[#0F392B] hover:bg-[#C8E947]/90 rounded-full px-8 py-3 font-bold"
+    },
+    "cards": {
+      "feature": "group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-8 hover:border-[#C8E947] transition-colors",
+      "stat": "bg-white rounded-xl border border-slate-100 p-6 flex flex-col justify-between"
+    },
+    "inputs": {
+      "default": "flex h-12 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F392B] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+    }
+  },
+  "image_urls": {
+    "hero_bg": {
+      "url": "https://images.unsplash.com/photo-1768219565623-501f93ae384b?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "alt": "Modern minimalist desk setup",
+      "usage": "Hero section background or split image"
+    },
+    "feature_mobile": {
+      "url": "https://images.unsplash.com/photo-1618034712596-6fa88a15bb15?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "alt": "Indian shopkeeper using smartphone",
+      "usage": "Mobile accessibility feature section"
+    },
+    "team_meeting": {
+      "url": "https://images.pexels.com/photos/6476256/pexels-photo-6476256.jpeg",
+      "alt": "Creative team meeting",
+      "usage": "About us or Team section"
+    },
+    "testimonial_user": {
+      "url": "https://images.pexels.com/photos/10375901/pexels-photo-10375901.jpeg",
+      "alt": "Happy business owner",
+      "usage": "Testimonial avatar"
+    },
+    "office_vibe": {
+      "url": "https://images.unsplash.com/photo-1758608631036-7a2370684905?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "alt": "Clean workspace",
+      "usage": "Login/Signup page side image"
+    }
+  },
+  "instructions_to_main_agent": {
+    "general": "Follow the 'Anti-AI' design philosophy. Avoid generic layouts. Use the specified color palette strictly. Do not use default Shadcn styles without customization.",
+    "setup": "Install 'lucide-react' for icons. Use 'recharts' for charts (via Shadcn charts if available, or raw Recharts).",
+    "styling": "Use Tailwind CSS for all styling. Avoid inline styles. Use the 'cn' utility for class merging.",
+    "charts": "For the dashboard, use Recharts. Style them to match the 'Deep Emerald' and 'Electric Lime' palette. Avoid default rainbow colors.",
+    "animations": "Add 'framer-motion' for page transitions and micro-interactions. Use 'AnimatePresence' for conditional rendering.",
+    "accessibility": "Ensure all text meets APCA contrast standards. Use semantic HTML5 tags."
+  },
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy",
+    "Use glass-morphism effects with backdrop filters (12-24px blur)",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file. This disrupts the human natural reading flow of text",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯📚🎭🎬🎪🎉🎊🎁🎀🎂🍰🎈🎨🎰💰💵💳🏦💎🪙💸🤑📊📈📉💹🔢🏆🥇 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
+    "Main agent relies on these image URLs. Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN",
+    "Prioritize using pre-existing components from src/components/ui when applicable",
+    "Create new components that match the style and conventions of existing components when needed",
+    "Examine existing components to understand the project's component patterns before creating new ones",
+    "Components MUST use named exports (export const ComponentName = ...)",
+    "Pages MUST use default exports (export default function PageName() {...})",
+    "Use sonner for toasts. Sonner component are located in /app/src/components/ui/sonner.tsx"
+  ]
+}

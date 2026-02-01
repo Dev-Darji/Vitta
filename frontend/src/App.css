@@ -1,0 +1,47 @@
+.App {
+  min-height: 100vh;
+}
+
+.App-header {
+  background: linear-gradient(135deg, #0F392B 0%, #1a5940 100%);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #C8E947;
+  text-decoration: none;
+}
+
+.App-link:hover {
+  opacity: 0.8;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F2F5F3;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #0F392B;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #1a5940;
+}
