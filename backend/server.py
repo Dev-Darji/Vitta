@@ -78,8 +78,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-api_router = APIRouter(prefix="/api")
-
 @api_router.get("/health")
 async def health_check():
     return {"status": "healthy", "environment": "production" if "render" in str(os.environ.get("HOSTNAME", "")) else "local"}
@@ -807,34 +805,6 @@ async def get_monthly_trend(current_user: User = Depends(get_current_user)):
             continue
     
     return sorted(monthly_data.values(), key=lambda x: x['month'])
-
-# Add CORS middleware BEFORE including the router
-# Parse CORS origins from environment variable
-cors_origins_str = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://localhost:3001,https://vitta-theta.vercel.app')
-allowed_origins = [origin.strip() for origin in cors_origins_str.split(',') if origin.strip()]
-
-# Add variations of the Vercel URL just in case
-extra_origins = [
-    "https://vitta-theta.vercel.app",
-    "https://vitta-theta.vercel.app/",
-    "http://vitta-theta.vercel.app",
-    "http://vitta-theta.vercel.app/"
-]
-for origin in extra_origins:
-    if origin not in allowed_origins:
-        allowed_origins.append(origin)
-
-print(f"DEBUG: Allowed CORS Origins: {allowed_origins}")
-logger.info(f"CORS initialized with origins: {allowed_origins}")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
 
 # Global exception handler for debugging
 @app.exception_handler(Exception)
