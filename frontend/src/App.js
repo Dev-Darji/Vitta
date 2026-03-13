@@ -14,7 +14,7 @@ import AuthPage from '@/pages/Auth';
 // Private Pages
 import DashboardLayout from '@/components/DashboardLayout';
 import Dashboard from '@/pages/Dashboard';
-import ImportStatement from '@/pages/ImportStatement';
+import AddTransactions from '@/pages/AddTransactions';
 import Transactions from '@/pages/Transactions';
 import Reports from '@/pages/Reports';
 import Categories from '@/pages/Categories';
@@ -47,7 +47,7 @@ function App() {
           
           {/* Private Routes */}
           <Route path="/dashboard" element={<PrivateRoute><DashboardLayout><Dashboard /></DashboardLayout></PrivateRoute>} />
-          <Route path="/import" element={<PrivateRoute><DashboardLayout><ImportStatement /></DashboardLayout></PrivateRoute>} />
+          <Route path="/import" element={<PrivateRoute><DashboardLayout><AddTransactions /></DashboardLayout></PrivateRoute>} />
           <Route path="/transactions" element={<PrivateRoute><DashboardLayout><Transactions /></DashboardLayout></PrivateRoute>} />
           <Route path="/reports" element={<PrivateRoute><DashboardLayout><Reports /></DashboardLayout></PrivateRoute>} />
           <Route path="/categories" element={<PrivateRoute><DashboardLayout><Categories /></DashboardLayout></PrivateRoute>} />

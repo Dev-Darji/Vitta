@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, Upload } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, Upload, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '@/lib/api';
@@ -206,8 +206,8 @@ const Dashboard = () => {
         <div className="flex flex-wrap gap-3">
           <Link to="/import">
             <Button data-testid="quick-import-button" className="bg-primary hover:bg-primary/90 text-white">
-              <Upload className="h-4 w-4 mr-2" />
-              Import Statement
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Add Transactions
             </Button>
           </Link>
           <Link to="/transactions">

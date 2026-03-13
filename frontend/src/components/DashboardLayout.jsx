@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Upload, CreditCard, BarChart3, Tag, Wallet, Settings, LogOut, Menu } from 'lucide-react';
+import { LayoutDashboard, Upload, CreditCard, BarChart3, Tag, Wallet, Settings, LogOut, Menu, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const DashboardLayout = ({ children }) => {
@@ -18,7 +18,7 @@ const DashboardLayout = ({ children }) => {
 
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', testId: 'menu-dashboard' },
-    { path: '/import', icon: Upload, label: 'Import Statement', testId: 'menu-import' },
+    { path: '/import', icon: PlusCircle, label: 'Add Transactions', testId: 'menu-import' },
     { path: '/transactions', icon: CreditCard, label: 'Transactions', testId: 'menu-transactions' },
     { path: '/reports', icon: BarChart3, label: 'Reports', testId: 'menu-reports' },
     { path: '/categories', icon: Tag, label: 'Categories', testId: 'menu-categories' },
