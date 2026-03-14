@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React from 'react';
+import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import '@/App.css';
 
@@ -20,41 +20,71 @@ import Reports from '@/pages/Reports';
 import Categories from '@/pages/Categories';
 import Accounts from '@/pages/Accounts';
 import Settings from '@/pages/Settings';
+import ErrorPage from '@/pages/ErrorPage';
 
-const PrivateRoute = ({ children }) => {
+const PrivateRoute = () => {
   const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/login" />;
+  return token ? <Outlet /> : <Navigate to="/login" />;
 };
 
-const PublicRoute = ({ children }) => {
+const PublicRoute = () => {
   const token = localStorage.getItem('token');
-  return !token ? children : <Navigate to="/dashboard" />;
+  return !token ? <Outlet /> : <Navigate to="/dashboard" />;
 };
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Landing />,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: "/how-it-works",
+    element: <HowItWorks />,
+  },
+  {
+    path: "/pricing",
+    element: <Pricing />,
+  },
+  {
+    path: "/faq",
+    element: <FAQ />,
+  },
+  {
+    path: "/contact",
+    element: <Contact />,
+  },
+  {
+    element: <PublicRoute />,
+    children: [
+      { path: "/login", element: <AuthPage /> },
+      { path: "/signup", element: <AuthPage /> },
+    ]
+  },
+  {
+    element: <PrivateRoute />,
+    errorElement: <ErrorPage />,
+    children: [
+      {
+        element: <DashboardLayout><Outlet /></DashboardLayout>,
+        children: [
+          { path: "/dashboard", element: <Dashboard /> },
+          { path: "/import", element: <AddTransactions /> },
+          { path: "/transactions", element: <Transactions /> },
+          { path: "/reports", element: <Reports /> },
+          { path: "/categories", element: <Categories /> },
+          { path: "/accounts", element: <Accounts /> },
+          { path: "/settings", element: <Settings /> },
+        ]
+      }
+    ]
+  }
+]);
 
 function App() {
   return (
     <div className="App">
-      <BrowserRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Landing />} />
-          <Route path="/how-it-works" element={<HowItWorks />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/faq" element={<FAQ />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/login" element={<PublicRoute><AuthPage /></PublicRoute>} />
-          <Route path="/signup" element={<PublicRoute><AuthPage /></PublicRoute>} />
-          
-          {/* Private Routes */}
-          <Route path="/dashboard" element={<PrivateRoute><DashboardLayout><Dashboard /></DashboardLayout></PrivateRoute>} />
-          <Route path="/import" element={<PrivateRoute><DashboardLayout><AddTransactions /></DashboardLayout></PrivateRoute>} />
-          <Route path="/transactions" element={<PrivateRoute><DashboardLayout><Transactions /></DashboardLayout></PrivateRoute>} />
-          <Route path="/reports" element={<PrivateRoute><DashboardLayout><Reports /></DashboardLayout></PrivateRoute>} />
-          <Route path="/categories" element={<PrivateRoute><DashboardLayout><Categories /></DashboardLayout></PrivateRoute>} />
-          <Route path="/accounts" element={<PrivateRoute><DashboardLayout><Accounts /></DashboardLayout></PrivateRoute>} />
-          <Route path="/settings" element={<PrivateRoute><DashboardLayout><Settings /></DashboardLayout></PrivateRoute>} />
-        </Routes>
-      </BrowserRouter>
+      <RouterProvider router={router} />
       <Toaster position="top-right" />
     </div>
   );

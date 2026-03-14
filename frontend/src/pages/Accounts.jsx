@@ -14,6 +14,7 @@ const Accounts = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [newAccount, setNewAccount] = useState({
     account_name: '',
+    category: '',
     bank_name: '',
     opening_balance: 0,
   });
@@ -39,7 +40,7 @@ const Accounts = () => {
       await api.post('/accounts', newAccount);
       toast.success('Account created');
       setIsOpen(false);
-      setNewAccount({ account_name: '', bank_name: '', opening_balance: 0 });
+      setNewAccount({ account_name: '', category: '', bank_name: '', opening_balance: 0 });
       fetchAccounts();
     } catch (error) {
       toast.error('Failed to create account');
@@ -77,13 +78,21 @@ const Accounts = () => {
             </DialogHeader>
             <form data-testid="account-form" onSubmit={handleCreateAccount} className="space-y-4">
               <div>
-                <Label>Account Name</Label>
+                <Label>Client Name</Label>
                 <Input
                   data-testid="account-name-input"
                   value={newAccount.account_name}
                   onChange={(e) => setNewAccount({ ...newAccount, account_name: e.target.value })}
                   required
-                  placeholder="e.g., Business Checking"
+                  placeholder="e.g., John Doe"
+                />
+              </div>
+              <div>
+                <Label>Category</Label>
+                <Input
+                  value={newAccount.category}
+                  onChange={(e) => setNewAccount({ ...newAccount, category: e.target.value })}
+                  placeholder="e.g., Individual, Business"
                 />
               </div>
               <div>
@@ -150,7 +159,14 @@ const Accounts = () => {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="font-heading font-semibold text-lg text-primary mb-1">{account.account_name}</h3>
-                  <p className="text-sm text-slate-600">{account.bank_name}</p>
+                  <div className="flex gap-2">
+                    {account.category && (
+                      <span className="text-[10px] font-black tracking-widest uppercase bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                        {account.category}
+                      </span>
+                    )}
+                    <span className="text-sm text-slate-600">{account.bank_name}</span>
+                  </div>
                 </div>
                 <Button
                   variant="ghost"

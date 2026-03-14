@@ -2,37 +2,48 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   PenLine, Download, FileSpreadsheet, FileText, Upload, X, CheckCircle2,
-  AlertCircle, ArrowRight, Plus, Loader2, GripVertical, Info, CalendarDays, IndianRupee
+  AlertCircle, ArrowRight, Plus, Loader2, GripVertical, Info, CalendarDays, IndianRupee, Tag,
+  Scale, AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import * as XLSX from 'xlsx';
+import { useBlocker, useNavigate } from 'react-router-dom';
+import ConfirmPopup from '@/components/ConfirmPopup';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const headerMap = {
-  Date: ["date", "transaction date", "txn date", "tran date", "posting date"],
-  ValueDate: ["value date", "val date"],
-  Description: ["description", "narration", "remarks", "particulars", "details", "transaction details", "transaction remarks"],
-  Debit: ["debit", "withdrawal", "debit amount", "dr", "withdrawal amt", "amount out"],
-  Credit: ["credit", "deposit", "credit amount", "cr", "deposit amt", "amount in"],
-  Amount: ["amount", "transaction amount"],
-  Balance: ["balance", "closing balance", "running balance", "available balance"],
-  'Account Holder': ["account holder", "account holder name", "account name", "customer name", "name"],
-  'Bank Name': ["bank", "bank name", "banking institution"],
-  'Account Number': ["account number", "a/c number", "account no", "account no.", "acct number"],
-  'Transaction ID': ["transaction id", "txn id", "reference id", "ref id", "utr", "utr number", "rrn"],
-  'Transaction Number': ["transaction number", "txn number", "transaction no", "txn no", "transaction #"],
-  'Cheque Number': ["cheque number", "cheque no", "chq no", "cheque #", "chq number"],
-  Reference: ["reference", "ref no", "reference no", "reference number", "chq/ref no"],
-  Branch: ["branch", "branch name"],
-  Category: ["category", "transaction category"],
+  Date: ["date", "transaction date", "txn date", "tran date", "posting date", "date of transaction"],
+  ValueDate: ["value date", "val date", "value_date"],
+  Description: ["description", "narration", "remarks", "particulars", "details", "transaction details", "transaction remarks", "memo"],
+  Debit: ["debit", "withdrawal", "debit amount", "dr", "withdrawal amt", "amount out", "dr amount", "dr_amount"],
+  Credit: ["credit", "deposit", "credit amount", "cr", "deposit amt", "amount in", "cr amount", "cr_amount"],
+  Amount: ["amount", "transaction amount", "txn amount", "total amount"],
+  Balance: ["balance", "closing balance", "running balance", "available balance", "total balance"],
+  'Account Holder': ["account holder", "account holder name", "account name", "customer name", "name", "beneficiary name", "account_holder", "holder name"],
+  'Bank Name': ["bank", "bank name", "banking institution", "bank_name", "bank_name_"],
+  'Account Number': ["account number", "a/c number", "account no", "account no.", "acct number", "account_number"],
+  'Transaction ID': ["transaction id", "txn id", "reference id", "ref id", "utr", "utr number", "rrn", "trans id", "transaction_id"],
+  'Transaction Number': ["transaction number", "txn number", "transaction no", "txn no", "transaction #", "transaction_no"],
+  'Cheque Number': ["cheque number", "cheque no", "chq no", "cheque #", "chq number", "cheque_no"],
+  Reference: ["reference", "ref no", "reference no", "reference number", "chq/ref no", "reference_no"],
+  Branch: ["branch", "branch name", "branch_name"],
+  Category: ["category", "transaction category", "category_name"],
   Notes: ["notes", "comments", "remarks notes"]
 };
+
+const METADATA_SUGGESTIONS = [
+  { label: 'Reference ID', key: 'Reference ID' },
+  { label: 'Payment Mode', key: 'Mode' },
+  { label: 'Bill/Invoce #', key: 'Bill No' },
+  { label: 'Merchant', key: 'Merchant' },
+];
 
 // Extracted from the keys of the headerMap
 const SYSTEM_FIELDS = Object.keys(headerMap);
@@ -91,16 +102,104 @@ const parseCSV = (text) => {
 
   if (result.length < 1) return { headers: [], rows: [] };
   const headers = result[0];
-  const rows = result.slice(1).filter(r => r.some(v => v));
+  const rows = result.slice(1).filter(r => r.some(v => v)).map(row => {
+    const dateIdx = headers.findIndex(h => h.toLowerCase().includes('date'));
+    if (dateIdx !== -1 && row[dateIdx]) {
+      row[dateIdx] = normalizeDate(row[dateIdx]);
+    }
+    return row;
+  });
   return { headers, rows };
+};
+
+const parseExcel = async (file) => {
+  try {
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data);
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    if (jsonData.length === 0) return { headers: [], rows: [] };
+    const headers = jsonData[0].map(h => String(h || ''));
+    const rows = jsonData.slice(1).filter(r => r && r.length > 0 && r.some(v => v !== null && v !== '')).map(row => {
+      // Find date column index
+      const dateIdx = headers.findIndex(h => h.toLowerCase().includes('date'));
+      if (dateIdx !== -1 && row[dateIdx]) {
+        // If it's a number (Excel date), convert it
+        if (typeof row[dateIdx] === 'number') {
+          const date = new Date((row[dateIdx] - 25569) * 86400 * 1000);
+          const d = String(date.getDate()).padStart(2, '0');
+          const m = String(date.getMonth() + 1).padStart(2, '0');
+          const y = date.getFullYear();
+          row[dateIdx] = `${d}-${m}-${y}`;
+        } else {
+          row[dateIdx] = normalizeDate(String(row[dateIdx]));
+        }
+      }
+      return row;
+    });
+    return { headers, rows };
+  } catch (err) {
+    console.error('Excel parse error:', err);
+    throw new Error('Failed to parse Excel file');
+  }
+};
+
+const normalizeDate = (dateStr) => {
+  if (!dateStr) return dateStr;
+  const str = String(dateStr).trim();
+  if (!str) return str;
+
+  // Handle Excel numeric date (if passed as string/number)
+  if (/^\d{5}(\.\d+)?$/.test(str)) {
+    const val = parseFloat(str);
+    const date = new Date((val - 25569) * 86400 * 1000);
+    const d = String(date.getDate()).padStart(2, '0');
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const y = date.getFullYear();
+    return `${d}-${m}-${y}`;
+  }
+
+  // Regex to match dates with any common separator (/, -, .)
+  // Supports YYYY-MM-DD, DD-MM-YYYY, MM-DD-YYYY
+  const match = str.match(/^(\d{1,4})[./-](\d{1,2})[./-](\d{1,4})$/);
+  if (match) {
+    let p1 = parseInt(match[1]);
+    let p2 = parseInt(match[2]);
+    let p3 = parseInt(match[3]);
+
+    // Format: YYYY-MM-DD
+    if (p1 > 1000) {
+      return `${String(p3).padStart(2, '0')}-${String(p2).padStart(2, '0')}-${p1}`;
+    }
+    // Format: DD-MM-YYYY or MM-DD-YYYY
+    if (p3 > 1000) {
+      // Ambiguity check: if p2 > 12, it must be the day (MM-DD-YYYY)
+      if (p2 > 12) {
+        return `${String(p2).padStart(2, '0')}-${String(p1).padStart(2, '0')}-${p3}`;
+      }
+      // Otherwise, assume it's already DD-MM-YYYY (or if it's 01-01, both work)
+      return `${String(p1).padStart(2, '0')}-${String(p2).padStart(2, '0')}-${p3}`;
+    }
+  }
+
+  return str;
 };
 
 const autoMapHeaders = (fileHeaders) => {
   const mapping = {};
   fileHeaders.forEach(h => {
-    const lower = h.toLowerCase().trim();
+    // Normalize header: lowercase, Replace underscores/dots/dashes with space, trim, remove double spaces
+    const normalized = String(h || '').toLowerCase().trim()
+      .replace(/[._-]/g, ' ')
+      .replace(/\s+/g, ' ');
+
     for (const [field, keywords] of Object.entries(headerMap)) {
-      if (keywords.includes(lower)) { mapping[h] = field; break; }
+      // Check for exact match or if normalized string is in keywords
+      const foundMatch = keywords.some(k => k === normalized) || field.toLowerCase() === normalized;
+      if (foundMatch) { 
+        mapping[h] = field; 
+        break; 
+      }
     }
   });
   return mapping;
@@ -113,10 +212,12 @@ const downloadTemplate = () => {
   const sample3 = '2026-01-17,Electricity Bill,3500,,621500';
   const csv = [headers, sample1, sample2, sample3].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
+  const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = 'vitta_transaction_template.csv';
+  a.setAttribute('hidden', '');
+  a.setAttribute('href', url);
+  a.setAttribute('download', 'vitta_transaction_template.csv');
+  document.body.appendChild(a);
   a.click();
   URL.revokeObjectURL(url);
 };
@@ -164,12 +265,17 @@ const DropZone = ({ accept, onFile, file, label, sublabel, loading }) => {
           <Upload className="h-8 w-8 text-primary" />
         )}
       </div>
-      {file ? (
-        <div>
-          <p className="font-semibold text-slate-900 mb-1">{file.name}</p>
-          <p className="text-sm text-slate-500">{(file.size / 1024).toFixed(1)} KB</p>
-        </div>
-      ) : (
+        {file ? (
+          <div>
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <p className="font-semibold text-slate-900">{file.name}</p>
+              {file.isGhost && (
+                <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">Recovered</span>
+              )}
+            </div>
+            <p className="text-sm text-slate-500">{(file.size / 1024).toFixed(1)} KB</p>
+          </div>
+        ) : (
         <div>
           <p className="font-semibold text-slate-800 mb-1">{label}</p>
           <p className="text-sm text-slate-500">{sublabel}</p>
@@ -185,35 +291,53 @@ const DropZone = ({ accept, onFile, file, label, sublabel, loading }) => {
 };
 
 // ─── Preview Table Component (defined OUTSIDE main component) ────────────────
-const PreviewTable = ({ headers, rows, maxRows = 10 }) => {
+const PreviewTable = ({ headers, rows, mapping = {}, maxRows = 12 }) => {
   const display = rows.slice(0, maxRows);
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200">
-      <table className="w-full text-sm">
-        <thead className="bg-slate-50 border-b border-slate-200">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider w-10">#</th>
-            {headers.map((h, i) => (
-              <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {display.map((row, ri) => (
-            <tr key={ri} className="hover:bg-slate-50 transition-colors">
-              <td className="px-4 py-3 text-slate-400 font-mono text-xs">{ri + 1}</td>
-              {headers.map((_, ci) => (
-                <td key={ci} className="px-4 py-3 text-slate-700 whitespace-nowrap">{row[ci] || '—'}</td>
-              ))}
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-100 w-12">#</th>
+              {headers.map((h, i) => {
+                const isMapped = mapping && mapping[h];
+                return (
+                  <th key={i} className="px-4 py-3 text-left border-r border-slate-100 last:border-0 group">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight">
+                        {h}
+                      </span>
+                      {isMapped && (
+                        <span className="text-[9px] font-bold text-primary flex items-center gap-1">
+                          <CheckCircle2 className="h-2 w-2" /> {mapping[h]}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {display.map((row, ri) => (
+              <tr key={ri} className="hover:bg-slate-50/80 transition-colors group">
+                <td className="px-4 py-3 text-slate-400 font-mono text-xs border-r border-slate-100 bg-slate-50/30 group-hover:bg-slate-100/50 transition-colors text-center">{ri + 1}</td>
+                {headers.map((_, ci) => (
+                  <td key={ci} className="px-4 py-3 text-slate-700 whitespace-nowrap border-r border-slate-100 last:border-0">
+                    <span className="font-medium text-slate-600">{row[ci] || '—'}</span>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {rows.length > maxRows && (
-        <div className="px-4 py-3 bg-slate-50 text-center text-sm text-slate-500 border-t border-slate-200">
-          Showing {maxRows} of {rows.length} rows
+        <div className="px-6 py-4 bg-slate-50/50 text-center border-t border-slate-100">
+          <p className="text-xs font-semibold text-slate-500">
+            Previewing first {maxRows} of <span className="text-primary">{rows.length}</span> transactions
+          </p>
         </div>
       )}
     </div>
@@ -224,6 +348,9 @@ const PreviewTable = ({ headers, rows, maxRows = 10 }) => {
 const ColumnMappingModal = ({ open, onClose, fileHeaders, mapping, setMapping, customFields, setCustomFields, onConfirm }) => {
   const [newFieldName, setNewFieldName] = useState('');
   const allFields = [...SYSTEM_FIELDS, ...customFields];
+
+  // Identify all fields that are currently mapped
+  const mappedValues = Object.values(mapping).filter(Boolean);
 
   const addCustomField = () => {
     const name = newFieldName.trim();
@@ -277,9 +404,11 @@ const ColumnMappingModal = ({ open, onClose, fileHeaders, mapping, setMapping, c
                   <SelectItem value="skip">
                     <span className="text-slate-400">— Skip —</span>
                   </SelectItem>
-                  {allFields.map(f => (
-                    <SelectItem key={f} value={f}>{f}</SelectItem>
-                  ))}
+                  {allFields.map(f => {
+                    const isAlreadyUsed = mappedValues.includes(f) && mapping[header] !== f;
+                    if (isAlreadyUsed) return null;
+                    return <SelectItem key={f} value={f}>{f}</SelectItem>;
+                  })}
                 </SelectContent>
               </Select>
             </motion.div>
@@ -322,6 +451,7 @@ const AddTransactions = () => {
   const [accounts, setAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState('');
   const [categories, setCategories] = useState([]);
+  const navigate = useNavigate();
 
   // Manual Entry State
   const [manualForm, setManualForm] = useState({
@@ -330,10 +460,15 @@ const AddTransactions = () => {
     type: 'debit',
     amount: '',
     category_id: '',
+    balance: '',
   });
   const [manualCustomFields, setManualCustomFields] = useState([]); // Array of { key: '', value: '' }
   const [manualErrors, setManualErrors] = useState({});
   const [manualSubmitting, setManualSubmitting] = useState(false);
+
+  // Mismatch Popup State
+  const [mismatchData, setMismatchData] = useState(null);
+  const [mismatchConfirming, setMismatchConfirming] = useState(false);
 
   // CSV Import State
   const [csvFile, setCsvFile] = useState(null);
@@ -357,6 +492,149 @@ const AddTransactions = () => {
   const [pdfParsing, setPdfParsing] = useState(false);
   const [pdfImporting, setPdfImporting] = useState(false);
   const [pdfStep, setPdfStep] = useState('upload');
+
+  // Ghost File meta for session recovery
+  const [csvFileMeta, setCsvFileMeta] = useState(null);
+  const [templateFileMeta, setTemplateFileMeta] = useState(null);
+
+  // Persistence Key
+  const PERSIST_KEY = 'vitta_add_txn_state';
+
+  // Load state from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(PERSIST_KEY);
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        if (data.activeTab) setActiveTab(data.activeTab);
+        if (data.manualForm) setManualForm(data.manualForm);
+        if (data.manualCustomFields) setManualCustomFields(data.manualCustomFields);
+        if (data.csvStep) setCsvStep(data.csvStep);
+        if (data.csvData) setCsvData(data.csvData);
+        if (data.csvMapping) setCsvMapping(data.csvMapping);
+        if (data.csvCustomFields) setCsvCustomFields(data.csvCustomFields);
+        if (data.templateStep) setTemplateStep(data.templateStep);
+        if (data.templateData) setTemplateData(data.templateData);
+        if (data.csvFileMeta) setCsvFileMeta(data.csvFileMeta);
+        if (data.templateFileMeta) setTemplateFileMeta(data.templateFileMeta);
+        if (data.pdfStep) setPdfStep(data.pdfStep);
+      } catch (err) {
+        console.error('Failed to load persisted state:', err);
+      }
+    }
+  }, []);
+
+  // Save state to localStorage on any change
+  useEffect(() => {
+    const state = {
+      activeTab,
+      manualForm,
+      manualCustomFields,
+      csvStep,
+      csvData,
+      csvMapping,
+      csvCustomFields,
+      templateStep,
+      templateData,
+      csvFileMeta,
+      templateFileMeta,
+      pdfStep,
+    };
+    localStorage.setItem(PERSIST_KEY, JSON.stringify(state));
+  }, [activeTab, manualForm, manualCustomFields, csvStep, csvData, csvMapping, csvCustomFields, templateStep, templateData, csvFileMeta, templateFileMeta, pdfStep]);
+
+  // Handle Manual Balance Auto-calculation
+  useEffect(() => {
+    if (selectedAccount && activeTab === 'manual') {
+      const account = accounts.find(a => a.id === selectedAccount);
+      if (account) {
+        const amount = Number(manualForm.amount) || 0;
+        const newBalance = account.balance + (manualForm.type === 'credit' ? amount : -amount);
+        setManualForm(prev => ({ ...prev, balance: newBalance.toFixed(2) }));
+      }
+    }
+  }, [selectedAccount, manualForm.amount, manualForm.type, accounts, activeTab]);
+
+  const isDirty = useCallback(() => {
+    const initialManual = {
+      date: new Date().toISOString().split('T')[0],
+      description: '',
+      type: 'debit',
+      amount: '',
+      category_id: '',
+      balance: '',
+    };
+    
+    const manualDirty = 
+      manualForm.description !== '' || 
+      manualForm.amount !== '' || 
+      manualForm.category_id !== '' || 
+      manualCustomFields.length > 0;
+    const csvDirty = csvStep !== 'upload' || csvFile !== null;
+    const templateDirty = templateStep !== 'download' || templateFile !== null;
+    const pdfDirty = pdfFile !== null;
+
+    return manualDirty || csvDirty || templateDirty || pdfDirty;
+  }, [manualForm, manualCustomFields, csvStep, csvFile, templateStep, templateFile, pdfFile]);
+
+  // Route protection
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      isDirty() && currentLocation.pathname !== nextLocation.pathname
+  );
+
+  // Tab change protection
+  const [pendingTab, setPendingTab] = useState(null);
+  const handleTabChange = (val) => {
+    if (isDirty()) {
+      setPendingTab(val);
+    } else {
+      setActiveTab(val);
+    }
+  };
+
+  const confirmDiscard = () => {
+    // Clear state
+    localStorage.removeItem(PERSIST_KEY);
+    
+    // Reset all states
+    setCsvFile(null);
+    setCsvData(null);
+    setCsvMapping({});
+    setCsvStep('upload');
+    setCsvFileMeta(null);
+    
+    setTemplateFile(null);
+    setTemplateData(null);
+    setTemplateStep('download');
+    setTemplateFileMeta(null);
+    
+    
+    setPdfFile(null);
+    setPdfStep('upload');
+    
+    setManualForm({
+      date: new Date().toISOString().split('T')[0],
+      description: '', type: 'debit', amount: '', category_id: '', balance: '',
+    });
+    setManualCustomFields([]);
+    
+    if (blocker.state === "blocked") {
+      blocker.proceed();
+    } else if (pendingTab) {
+      setActiveTab(pendingTab);
+      setPendingTab(null);
+    }
+  };
+
+  const cancelDiscard = () => {
+    if (blocker.state === "blocked") {
+      blocker.reset();
+    }
+    setPendingTab(null);
+  };
+
+
 
   // Recent manual transactions
   const [recentTransactions, setRecentTransactions] = useState([]);
@@ -390,16 +668,17 @@ const AddTransactions = () => {
     return Object.keys(errs).length === 0;
   };
 
-  const handleManualSubmit = async (e) => {
-    e.preventDefault();
+  const handleManualSubmit = async (e, force = false) => {
+    if (e) e.preventDefault();
     if (!validateManual()) return;
+
     setManualSubmitting(true);
     try {
       const payload = {
         account_id: selectedAccount,
         date: manualForm.date,
         description: manualForm.description.trim(),
-        amount: Number(manualForm.amount),
+        amount: amount,
         type: manualForm.type,
         category_id: manualForm.category_id || null,
         metadata: manualCustomFields.reduce((acc, curr) => {
@@ -407,15 +686,29 @@ const AddTransactions = () => {
           return acc;
         }, {})
       };
+
+      // If we are forcing balance, we might need a backend update for account balance too
+      if (force && providedBalance !== null) {
+        await api.put(`/accounts/${selectedAccount}`, { balance: providedBalance });
+      }
       const res = await api.post('/transactions', payload);
+      
+      setAccounts(prev => prev.map(acc => 
+        acc.id === selectedAccount ? { 
+          ...acc, 
+          balance: acc.balance + (manualForm.type === 'credit' ? Number(manualForm.amount) : -Number(manualForm.amount)) 
+        } : acc
+      ));
+
       toast.success('Transaction added successfully!');
       setRecentTransactions(prev => [res.data, ...prev].slice(0, 5));
       setManualForm({
         date: new Date().toISOString().split('T')[0],
-        description: '', type: 'debit', amount: '', category_id: '',
+        description: '', type: 'debit', amount: '', category_id: '', balance: '',
       });
       setManualCustomFields([]);
       setManualErrors({});
+      setMismatchData(null);
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to add transaction');
     } finally {
@@ -426,7 +719,7 @@ const AddTransactions = () => {
   const clearManualForm = () => {
     setManualForm({
       date: new Date().toISOString().split('T')[0],
-      description: '', type: 'debit', amount: '', category_id: '',
+      description: '', type: 'debit', amount: '', category_id: '', balance: '',
     });
     setManualCustomFields([]);
     setManualErrors({});
@@ -437,6 +730,7 @@ const AddTransactions = () => {
     const ext = file.name.split('.').pop().toLowerCase();
     if (!['csv', 'xls', 'xlsx'].includes(ext)) { toast.error('Please upload a CSV or Excel file'); return; }
     setTemplateFile(file);
+    setTemplateFileMeta({ name: file.name, size: file.size });
     if (ext !== 'csv') {
       // For Excel files, we can't easily parse on frontend without a library,
       // so we'll just skip the preview and let them import directly.
@@ -445,59 +739,116 @@ const AddTransactions = () => {
     }
     setTemplateParsing(true);
     try {
-      const text = await file.text();
-      const parsed = parseCSV(text);
-      if (parsed.rows.length === 0) { toast.error('No data rows found'); setTemplateParsing(false); return; }
+      let parsed;
+      if (ext === 'csv') {
+        const text = await file.text();
+        parsed = parseCSV(text);
+      } else {
+        parsed = await parseExcel(file);
+      }
+      
+      if (parsed.rows.length === 0) { 
+        toast.error('No data rows found in the file'); 
+        setTemplateParsing(false); 
+        return; 
+      }
       setTemplateData(parsed);
       setTemplateStep('preview');
+      toast.success('File loaded successfully');
     } catch (err) { 
       console.error(err);
-      toast.error('Failed to parse CSV file'); 
+      toast.error('Failed to parse file'); 
     } finally { setTemplateParsing(false); }
   };
 
   const handleTemplateImport = async () => {
-    if (!templateData || !selectedAccount) return;
+    if (!selectedAccount) return;
+    if (!templateFile) {
+      toast.error('Session restored from refresh. Please re-upload the file to proceed with the import.', {
+        duration: 5000,
+        icon: <Info className="h-4 w-4 text-blue-500" />
+      });
+      setTemplateStep('download');
+      return;
+    }
     setTemplateImporting(true);
     try {
       const formData = new FormData();
       formData.append('file', templateFile);
-      const res = await api.post(`/import/csv?account_id=${selectedAccount}`, formData, {
+      const url = `/import/csv?account_id=${selectedAccount}${force ? '&force_balance=true' : ''}`;
+      const res = await api.post(url, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       toast.success(res.data.message);
       setTemplateStep('done');
-    } catch (err) { toast.error(err.response?.data?.detail || 'Import failed'); }
+      fetchData();
+    } catch (err) { 
+      if (err.response?.status === 409) {
+        setMismatchData({
+          ...err.response.data,
+          source: 'template'
+        });
+      } else {
+        toast.error(err.response?.data?.detail || 'Import failed'); 
+      }
+    }
     finally { setTemplateImporting(false); }
   };
 
-  const resetTemplate = () => { setTemplateFile(null); setTemplateData(null); setTemplateStep('download'); };
+  const resetTemplate = () => { 
+    setTemplateFile(null); 
+    setTemplateData(null); 
+    setTemplateStep('download'); 
+    setTemplateFileMeta(null);
+  };
 
   // ──── CSV logic ────
   const handleCsvFile = async (file) => {
     const ext = file.name.split('.').pop().toLowerCase();
     if (!['csv', 'xls', 'xlsx'].includes(ext)) { toast.error('Please upload a CSV or Excel file'); return; }
     setCsvFile(file);
+    setCsvFileMeta({ name: file.name, size: file.size });
     if (ext !== 'csv') {
       setCsvStep('preview-excel');
       return;
     }
     setCsvParsing(true);
     try {
-      const text = await file.text();
-      const parsed = parseCSV(text);
-      if (parsed.rows.length === 0) { toast.error('No data rows found'); setCsvParsing(false); return; }
+      let parsed;
+      if (ext === 'csv') {
+        const text = await file.text();
+        parsed = parseCSV(text);
+      } else {
+        parsed = await parseExcel(file);
+      }
+      
+      if (!parsed.rows || parsed.rows.length === 0) { 
+        toast.error('No valid data rows found in this file'); 
+        setCsvParsing(false); 
+        return; 
+      }
+      
       setCsvData(parsed);
       const autoMap = autoMapHeaders(parsed.headers);
       setCsvMapping(autoMap);
+      
+      // Always move to preview step so the user can see their data
+      setCsvStep('preview');
+      
       const mapped = Object.values(autoMap);
-      if (mapped.includes('Date') && mapped.includes('Description')) {
-        setCsvStep('preview');
-        toast.success('Columns auto-detected!');
+      const mandatoryFields = ['Date', 'Description'];
+      const hasMandatory = mandatoryFields.every(field => mapped.includes(field));
+
+      if (hasMandatory) {
+        toast.success('Columns auto-detected and matched!');
       } else {
+        toast.info('Please finish mapping your columns');
         setCsvMappingOpen(true);
       }
-    } catch { toast.error('Failed to parse file'); }
+    } catch (err) { 
+      console.error(err);
+      toast.error('Error parsing file. Please check the format.'); 
+    }
     finally { setCsvParsing(false); }
   };
 
@@ -507,22 +858,90 @@ const AddTransactions = () => {
     return { headers: mappedHeaders, rows: csvData.rows };
   };
 
-  const handleCsvImport = async () => {
-    if (!csvFile || !selectedAccount) return;
+  const handleCsvImport = async (force = false) => {
+    if (!selectedAccount) return;
+    if (!csvFile) {
+      toast.error('Session restored from refresh. Please re-upload the file to finalize the import.', {
+        duration: 5000,
+        icon: <Info className="h-4 w-4 text-blue-500" />
+      });
+      setCsvStep('upload');
+      return;
+    }
+
+    // Balance Verification Logic for CSV
+    if (!force) {
+      const balanceCol = Object.keys(csvMapping).find(h => csvMapping[h] === 'Balance');
+      if (balanceCol && csvData.rows.length > 0) {
+        const lastRow = csvData.rows[csvData.rows.length - 1];
+        const balanceIdx = csvData.headers.indexOf(balanceCol);
+        const providedFinalBalance = Number(lastRow[balanceIdx]);
+
+        if (!isNaN(providedFinalBalance)) {
+          const account = accounts.find(a => a.id === selectedAccount);
+          let delta = 0;
+          
+          // Calculate net change from the entire file
+          csvData.rows.forEach(row => {
+             // Find Debit/Credit/Amount columns
+             let amt = 0;
+             Object.entries(csvMapping).forEach(([header, mappedField]) => {
+                const idx = csvData.headers.indexOf(header);
+                const val = Number(row[idx]) || 0;
+                if (mappedField === 'Debit') amt -= val;
+                else if (mappedField === 'Credit') amt += val;
+                else if (mappedField === 'Amount') {
+                   // This is trickier if type isn't known, but usuallystatements have separate Dr/Cr
+                }
+             });
+             delta += amt;
+          });
+
+          const expectedFinal = account.balance + delta;
+          if (Math.abs(expectedFinal - providedFinalBalance) > 0.01) {
+            setMismatchData({
+              source: 'csv',
+              calculated: expectedFinal,
+              provided: providedFinalBalance,
+            });
+            return;
+          }
+        }
+      }
+    }
+
     setCsvImporting(true);
     try {
       const formData = new FormData();
       formData.append('file', csvFile);
-      const res = await api.post(`/import/csv?account_id=${selectedAccount}`, formData, {
+      const url = `/import/csv?account_id=${selectedAccount}${force ? '&force_balance=true' : ''}`;
+      const res = await api.post(url, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       toast.success(res.data.message);
       setCsvStep('done');
-    } catch (err) { toast.error(err.response?.data?.detail || 'Import failed'); }
+      fetchData(); // Refresh account balances
+    } catch (err) { 
+      if (err.response?.status === 409) {
+        setMismatchData({
+          ...err.response.data,
+          source: 'csv'
+        });
+      } else {
+        toast.error(err.response?.data?.detail || 'Import failed'); 
+      }
+    }
     finally { setCsvImporting(false); }
   };
 
-  const resetCsv = () => { setCsvFile(null); setCsvData(null); setCsvMapping({}); setCsvCustomFields([]); setCsvStep('upload'); };
+  const resetCsv = () => { 
+    setCsvFile(null); 
+    setCsvData(null); 
+    setCsvMapping({}); 
+    setCsvCustomFields([]); 
+    setCsvStep('upload'); 
+    setCsvFileMeta(null);
+  };
 
   // ──── PDF logic ────
   const handlePdfFile = (file) => {
@@ -530,18 +949,29 @@ const AddTransactions = () => {
     setPdfFile(file);
   };
 
-  const handlePdfImport = async () => {
+  const handlePdfImport = async (force = false) => {
     if (!pdfFile || !selectedAccount) return;
     setPdfImporting(true);
     try {
       const formData = new FormData();
       formData.append('file', pdfFile);
-      const res = await api.post(`/import/csv?account_id=${selectedAccount}`, formData, {
+      const url = `/import/csv?account_id=${selectedAccount}${force ? '&force_balance=true' : ''}`;
+      const res = await api.post(url, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       toast.success(res.data.message);
       setPdfStep('done');
-    } catch (err) { toast.error(err.response?.data?.detail || 'PDF parsing failed'); }
+      fetchData();
+    } catch (err) { 
+      if (err.response?.status === 409) {
+        setMismatchData({
+          ...err.response.data,
+          source: 'pdf'
+        });
+      } else {
+        toast.error(err.response?.data?.detail || 'PDF parsing failed'); 
+      }
+    }
     finally { setPdfImporting(false); }
   };
 
@@ -581,24 +1011,13 @@ const AddTransactions = () => {
   // ════════════════════════════════════════════════════════════════════════════
   return (
     <div data-testid="add-transactions-page" className="max-w-5xl mx-auto">
-      {/* Page Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-        className="mb-6"
-      >
-        <h2 className="font-heading font-bold text-2xl text-primary mb-1">Add Transactions</h2>
-        <p className="text-slate-500 text-sm">Add or import transactions using multiple methods</p>
-      </motion.div>
-
       {/* Tabs */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, delay: 0.1 }}
       >
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="w-full h-auto flex flex-wrap gap-1 bg-slate-200/50 backdrop-blur-sm p-1.5 rounded-2xl mb-8 border border-slate-200/60">
             {TAB_META.map((tab) => {
               const isActive = activeTab === tab.value;
@@ -631,7 +1050,7 @@ const AddTransactions = () => {
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
               className="bg-white rounded-3xl border border-slate-200 p-6 lg:p-10"
             >
               {/* Manual Entry */}
@@ -643,212 +1062,299 @@ const AddTransactions = () => {
                   </div>
                   {renderAccountSelector()}
 
-                <form onSubmit={handleManualSubmit} className="bg-slate-50/50 p-6 sm:p-8 rounded-2xl border border-slate-100 space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    {/* Date */}
-                    <div>
-                      <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Date</Label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <CalendarDays className="h-4 w-4 text-slate-400" />
-                        </div>
-                        <Input
-                          type="date"
-                          value={manualForm.date}
-                          onChange={e => setManualForm(p => ({ ...p, date: e.target.value }))}
-                          className={`pl-10 bg-white ${manualErrors.date ? 'border-red-400 focus:ring-red-400' : ''}`}
-                        />
-                      </div>
-                      {manualErrors.date && <p className="text-xs text-red-500 mt-1">{manualErrors.date}</p>}
-                    </div>
-
-                    {/* Category */}
-                    <div>
-                      <Label className="text-sm font-medium text-slate-700 mb-1.5 block">
-                        Category <span className="text-slate-400 font-normal">(optional)</span>
-                      </Label>
-                      <Select
-                        value={manualForm.category_id || 'none'}
-                        onValueChange={val => setManualForm(p => ({ ...p, category_id: val === 'none' ? '' : val }))}
-                      >
-                        <SelectTrigger className="w-full bg-white">
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">
-                            <span className="text-slate-400">— None —</span>
-                          </SelectItem>
-                          {categories.map(cat => (
-                            <SelectItem key={cat.id} value={cat.id}>
-                              <div className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cat.color }} />
-                                {cat.name}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Description</Label>
-                    <Input
-                      placeholder="e.g. Office rent payment, Client invoice..."
-                      value={manualForm.description}
-                      onChange={e => setManualForm(p => ({ ...p, description: e.target.value }))}
-                      className={`bg-white ${manualErrors.description ? 'border-red-400' : ''}`}
-                    />
-                    {manualErrors.description && <p className="text-xs text-red-500 mt-1">{manualErrors.description}</p>}
-                  </div>
-
-                  {/* Type & Amount */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Transaction Type</Label>
-                      <Select
-                        value={manualForm.type}
-                        onValueChange={val => setManualForm(p => ({ ...p, type: val }))}
-                      >
-                        <SelectTrigger className="w-full bg-white">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="debit">Money Out (Debit)</SelectItem>
-                          <SelectItem value="credit">Money In (Credit)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm font-medium text-slate-700 mb-1.5 block">
-                        Amount <span className="text-slate-400 font-normal">(₹)</span>
-                      </Label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <IndianRupee className="h-4 w-4 text-slate-400" />
-                        </div>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={manualForm.amount}
-                          onChange={e => setManualForm(p => ({ ...p, amount: e.target.value }))}
-                          className={`pl-9 bg-white ${manualErrors.amount ? 'border-red-400' : ''}`}
-                        />
-                      </div>
-                      {manualErrors.amount && <p className="text-xs text-red-500 mt-1">{manualErrors.amount}</p>}
-                    </div>
-                  </div>
-
-                  {/* Custom / Additional Fields */}
-                  {manualCustomFields.length > 0 && (
-                    <div className="space-y-4 pt-4 border-t border-slate-100">
-                      <h4 className="text-sm font-semibold text-slate-700">Additional Details</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {manualCustomFields.map((field, index) => (
-                          <div key={index} className="flex flex-col gap-1.5 p-3 bg-white rounded-xl border border-slate-100 relative group">
-                            <Input
-                              placeholder="Field Name (e.g. Reference)"
-                              value={field.key} 
-                              onChange={(e) => {
-                                const newFields = [...manualCustomFields];
-                                newFields[index].key = e.target.value;
-                                setManualCustomFields(newFields);
-                              }}
-                              className="text-xs font-semibold text-slate-500 uppercase tracking-wider bg-transparent border-0 border-b border-transparent placeholder:normal-case p-0 h-6 focus-visible:ring-0 focus-visible:border-primary"
-                            />
-                            <Input
-                              placeholder="Value..."
-                              value={field.value}
-                              onChange={(e) => {
-                                const newFields = [...manualCustomFields];
-                                newFields[index].value = e.target.value;
-                                setManualCustomFields(newFields);
-                              }}
-                              className="bg-transparent border-0 border-b border-slate-200 rounded-none px-0 focus-visible:ring-0 focus-visible:border-primary"
-                            />
-                            <button 
-                              type="button" 
-                              onClick={() => setManualCustomFields(prev => prev.filter((_, i) => i !== index))}
-                              className="absolute right-2 top-2 p-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
+                  <form onSubmit={handleManualSubmit} className="bg-slate-50/50 p-6 sm:p-8 rounded-2xl border border-slate-100 space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      {/* Date */}
+                      <div>
+                        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Date</Label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <CalendarDays className="h-4 w-4 text-slate-400" />
                           </div>
-                        ))}
+                          <Input
+                            type="date"
+                            value={manualForm.date}
+                            onChange={e => setManualForm(p => ({ ...p, date: e.target.value }))}
+                            className={`pl-10 bg-white ${manualErrors.date ? 'border-red-400 focus:ring-red-400' : ''}`}
+                          />
+                        </div>
+                        {manualErrors.date && <p className="text-xs text-red-500 mt-1">{manualErrors.date}</p>}
+                      </div>
+
+                      {/* Category */}
+                      <div>
+                        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                          Category <span className="text-slate-400 font-normal">(optional)</span>
+                        </Label>
+                        <Select
+                          value={manualForm.category_id || 'none'}
+                          onValueChange={val => setManualForm(p => ({ ...p, category_id: val === 'none' ? '' : val }))}
+                        >
+                          <SelectTrigger className="w-full bg-white">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              <span className="text-slate-400">— None —</span>
+                            </SelectItem>
+                            {categories.map(cat => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cat.color }} />
+                                  {cat.name}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                  )}
 
-                  {/* Actions */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-200/60 mt-6">
-                    <div className="flex flex-wrap gap-3">
-                      <Button
-                        type="submit"
-                        disabled={manualSubmitting || !selectedAccount}
-                        className="bg-primary hover:bg-primary/90 text-white px-8 py-5 text-sm font-semibold rounded-xl"
-                      >
-                        {manualSubmitting ? (
-                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Adding...</>
-                        ) : (
-                          <><Plus className="h-4 w-4 mr-2" /> Add Transaction</>
+                    {/* Description */}
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Description</Label>
+                      <Input
+                        placeholder="e.g. Office rent payment, Client invoice..."
+                        value={manualForm.description}
+                        onChange={e => setManualForm(p => ({ ...p, description: e.target.value }))}
+                        className={`bg-white ${manualErrors.description ? 'border-red-400' : ''}`}
+                      />
+                      {manualErrors.description && <p className="text-xs text-red-500 mt-1">{manualErrors.description}</p>}
+                    </div>
+
+                    {/* Type & Amount */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div>
+                        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Transaction Type</Label>
+                        <Select
+                          value={manualForm.type}
+                          onValueChange={val => setManualForm(p => ({ ...p, type: val }))}
+                        >
+                          <SelectTrigger className="w-full bg-white">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="debit">Money Out (Debit)</SelectItem>
+                            <SelectItem value="credit">Money In (Credit)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                          Amount <span className="text-slate-400 font-normal">(₹)</span>
+                        </Label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <IndianRupee className="h-4 w-4 text-slate-400" />
+                          </div>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={manualForm.amount}
+                            onChange={e => setManualForm(p => ({ ...p, amount: e.target.value }))}
+                            className={`pl-9 bg-white ${manualErrors.amount ? 'border-red-400' : ''}`}
+                          />
+                        </div>
+                        {manualErrors.amount && <p className="text-xs text-red-500 mt-1">{manualErrors.amount}</p>}
+                      </div>
+
+                      <div>
+                        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                          Closing Balance <span className="text-slate-400 font-normal">(₹ - Optional)</span>
+                        </Label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Scale className="h-4 w-4 text-slate-400" />
+                          </div>
+                          <Input
+                            type="number"
+                            placeholder="Calculating..."
+                            value={manualForm.balance}
+                            readOnly
+                            className="pl-9 bg-slate-50 border-slate-200 text-slate-500 font-semibold cursor-not-allowed"
+                          />
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1.5 font-medium italic">
+                          Auto-calculated next balance
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Custom / Additional Fields */}
+                    <div className="space-y-4 pt-6 border-t border-slate-200/60">
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => setManualCustomFields(prev => [...prev, { key: '', value: '' }])}
+                          className="flex items-center gap-2 group/add-header"
+                        >
+                          <div className="p-1.5 bg-primary/10 rounded-lg group-hover/add-header:bg-primary transition-all duration-300">
+                            <Plus className="h-4 w-4 text-primary group-hover/add-header:text-white transition-colors" />
+                          </div>
+                          <h4 className="text-sm font-semibold text-slate-800 group-hover/add-header:text-primary transition-colors">Additional Details</h4>
+                        </button>
+                        
+                        {manualCustomFields.length === 0 && (
+                          <div className="flex gap-2">
+                            {METADATA_SUGGESTIONS.map((s) => (
+                              <button
+                                key={s.key}
+                                type="button"
+                                onClick={() => setManualCustomFields(prev => [...prev, { key: s.key, value: '' }])}
+                                className="text-[11px] font-medium bg-white border border-slate-200 text-slate-600 px-2.5 py-1 rounded-full hover:border-primary hover:text-primary transition-all shadow-sm"
+                              >
+                                + {s.label}
+                              </button>
+                            ))}
+                          </div>
                         )}
-                      </Button>
-                      <Button type="button" variant="outline" onClick={clearManualForm} className="rounded-xl py-5 bg-white">
-                        Clear Form
-                      </Button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <AnimatePresence mode="popLayout">
+                          {manualCustomFields.map((field, index) => (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                              className="group relative flex flex-col sm:flex-row gap-4 p-5 bg-slate-50/50 hover:bg-white rounded-[28px] border-2 border-slate-100 hover:border-primary/20 shadow-sm hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500"
+                            >
+                              {/* Field Name */}
+                              <div className="flex-1 space-y-1.5 min-w-0">
+                                <div className="flex items-center gap-1.5 px-1">
+                                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Field Name</Label>
+                                  <Tag className="h-2.5 w-2.5 text-slate-300" />
+                                </div>
+                                <Input
+                                  placeholder="Property..."
+                                  value={field.key}
+                                  onChange={(e) => {
+                                    const newFields = [...manualCustomFields];
+                                    newFields[index].key = e.target.value;
+                                    setManualCustomFields(newFields);
+                                  }}
+                                  className="h-12 bg-white border-2 border-slate-100 rounded-2xl px-4 text-sm font-bold text-slate-700 placeholder:font-medium placeholder:text-slate-300 focus-visible:ring-4 focus-visible:ring-primary/5 focus-visible:border-primary transition-all shadow-sm"
+                                />
+                              </div>
+
+                              {/* Value */}
+                              <div className="flex-1 space-y-1.5 min-w-0">
+                                <div className="flex items-center gap-1.5 px-1">
+                                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Value</Label>
+                                </div>
+                                <Input
+                                  placeholder="Detail..."
+                                  value={field.value}
+                                  onChange={(e) => {
+                                    const newFields = [...manualCustomFields];
+                                    newFields[index].value = e.target.value;
+                                    setManualCustomFields(newFields);
+                                  }}
+                                  className="h-12 bg-white border-2 border-slate-100 rounded-2xl px-4 text-sm font-bold text-slate-900 placeholder:font-normal placeholder:text-slate-300 focus-visible:ring-4 focus-visible:ring-primary/5 focus-visible:border-primary transition-all shadow-sm"
+                                />
+                              </div>
+
+                              {/* Delete Button */}
+                              <button
+                                type="button"
+                                onClick={() => setManualCustomFields(prev => prev.filter((_, i) => i !== index))}
+                                className="absolute -top-2 -right-2 h-7 w-7 bg-white text-slate-400 hover:text-red-500 hover:scale-110 rounded-full flex items-center justify-center shadow-md border border-slate-100 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+                      </div>
+
+                      {manualCustomFields.length > 0 && (
+                        <div className="flex items-center gap-3">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-primary hover:bg-primary/5 text-xs font-semibold rounded-lg"
+                            onClick={() => setManualCustomFields(prev => [...prev, { key: '', value: '' }])}
+                          >
+                            <Plus className="h-3.5 w-3.5 mr-1" /> Add Another Field
+                          </Button>
+                          <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                            {METADATA_SUGGESTIONS.filter(s => !manualCustomFields.some(f => f.key === s.key)).map((s) => (
+                              <button
+                                key={s.key}
+                                type="button"
+                                onClick={() => setManualCustomFields(prev => [...prev, { key: s.key, value: '' }])}
+                                className="whitespace-nowrap text-[10px] font-medium bg-slate-50 text-slate-500 px-2 py-1 rounded-md hover:bg-primary/10 hover:text-primary transition-all border border-slate-100"
+                              >
+                                + {s.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      className="text-primary font-medium hover:bg-primary/10 rounded-xl"
-                      onClick={() => setManualCustomFields(prev => [...prev, { key: '', value: '' }])}
-                    >
-                      <Plus className="h-4 w-4 mr-1.5" /> Add Custom Field
-                    </Button>
-                  </div>
-                </form>
-
-                {/* Recent Transactions */}
-                <AnimatePresence>
-                  {recentTransactions.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-6 pt-6 border-t border-slate-200"
-                    >
-                      <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        Recently Added
-                      </h4>
-                      <div className="space-y-2">
-                        {recentTransactions.map((txn, idx) => (
-                          <motion.div
-                            key={txn.id || idx}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: idx * 0.05 }}
-                            className="flex items-center justify-between p-3 bg-green-50/60 rounded-lg border border-green-100"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs text-slate-500 font-mono">{txn.date}</span>
-                              <span className="text-sm text-slate-800">{txn.description}</span>
-                            </div>
-                            <span className={`text-sm font-semibold ${txn.type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
-                              {txn.type === 'credit' ? '+' : '-'}₹{txn.amount?.toLocaleString('en-IN')}
-                            </span>
-                          </motion.div>
-                        ))}
+                    {/* Actions */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-200/60 mt-6">
+                      <div className="flex flex-wrap gap-3">
+                        <Button
+                          type="submit"
+                          disabled={manualSubmitting || !selectedAccount}
+                          className="bg-primary hover:bg-primary/90 text-white px-8 py-5 text-sm font-semibold rounded-xl"
+                        >
+                          {manualSubmitting ? (
+                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Adding...</>
+                          ) : (
+                            <><Plus className="h-4 w-4 mr-2" /> Add Transaction</>
+                          )}
+                        </Button>
+                        <Button type="button" variant="outline" onClick={clearManualForm} className="rounded-xl py-5 bg-white">
+                          Clear Form
+                        </Button>
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </TabsContent>
+                    </div>
+                  </form>
+
+                  {/* Recent Transactions */}
+                  <AnimatePresence>
+                    {recentTransactions.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-6 pt-6 border-t border-slate-200"
+                      >
+                        <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          Recently Added
+                        </h4>
+                        <div className="space-y-2">
+                          {recentTransactions.map((txn, idx) => (
+                            <motion.div
+                              key={txn.id || idx}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: idx * 0.05 }}
+                              className="flex items-center justify-between p-3 bg-green-50/60 rounded-lg border border-green-100"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-slate-500 font-mono">{normalizeDate(txn.date)}</span>
+                                <span className="text-sm text-slate-800">{txn.description}</span>
+                              </div>
+                              <span className={`text-sm font-semibold ${txn.type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
+                                {txn.type === 'credit' ? '+' : '-'}₹{txn.amount?.toLocaleString('en-IN')}
+                              </span>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </TabsContent>
 
               {/* Bulk Entry Template */}
               <TabsContent value="template" className="mt-0 focus-visible:ring-0 outline-none">
@@ -859,225 +1365,272 @@ const AddTransactions = () => {
                   </div>
                   {renderAccountSelector()}
 
-                {/* Step 1: Download Template */}
-                <div className="p-5 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-2xl border border-primary/10">
-                  <div className="flex items-start gap-4">
-                    <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                      <Download className="h-6 w-6 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-slate-900 mb-1">Step 1: Download Template</h4>
-                      <p className="text-sm text-slate-500 mb-3">
-                        Download the template, add your transactions in Excel, and upload the file to import them.
-                      </p>
-                      <Button onClick={downloadTemplate} variant="outline" className="rounded-xl">
-                        <Download className="h-4 w-4 mr-2" /> Download Excel Template
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Step 2: Upload filled template */}
-                {templateStep === 'download' && (
-                  <div>
-                    <h4 className="font-semibold text-slate-800 mb-3">Step 2: Upload Filled Template</h4>
-                    <DropZone
-                      accept=".csv,.xls,.xlsx"
-                      onFile={handleTemplateFile}
-                      file={templateFile}
-                      loading={templateParsing}
-                      label="Drop your filled template here"
-                      sublabel="CSV, XLS, or XLSX files"
-                    />
-                  </div>
-                )}
-
-                {/* Step 3: Preview */}
-                {templateStep === 'preview' && templateData && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-slate-800">Preview ({templateData.rows.length} transactions)</h4>
-                      <Button variant="ghost" size="sm" onClick={resetTemplate}>
-                        <X className="h-4 w-4 mr-1" /> Reset
-                      </Button>
-                    </div>
-                    <PreviewTable headers={templateData.headers} rows={templateData.rows} />
-                    <div className="flex gap-3 mt-4">
-                      <Button
-                        onClick={handleTemplateImport}
-                        disabled={templateImporting}
-                        className="bg-primary hover:bg-primary/90 text-white px-8 py-5 rounded-xl"
+                  <AnimatePresence mode="wait">
+                    {/* Step 1 & 2: Download & Upload (Shown if not in preview or done) */}
+                    {(templateStep === 'download' || templateStep === 'upload') && (
+                      <motion.div
+                        key="upload-section"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="space-y-8"
                       >
-                        {templateImporting ? (
-                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importing...</>
-                        ) : (
-                          <><CheckCircle2 className="h-4 w-4 mr-2" /> Confirm Import</>
-                        )}
-                      </Button>
-                      <Button variant="outline" onClick={resetTemplate} className="rounded-xl py-5">Cancel</Button>
-                    </div>
-                  </motion.div>
-                )}
+                        {/* Step 1: Download Template */}
+                        <div className="p-6 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-[32px] border-2 border-primary/10 shadow-sm">
+                          <div className="flex items-start gap-5">
+                            <div className="h-14 w-14 rounded-2xl bg-white flex items-center justify-center shrink-0 shadow-lg shadow-primary/5 border border-primary/10">
+                              <Download className="h-7 w-7 text-primary" />
+                            </div>
+                            <div className="flex-1 pt-1">
+                              <h4 className="text-lg font-bold text-slate-900 mb-1">Step 1: Download Official Template</h4>
+                              <p className="text-sm text-slate-500 mb-5 leading-relaxed">
+                                Get our recommended format to ensure zero errors during import. Add your transaction details in Excel and come back here to upload.
+                              </p>
+                              <Button onClick={downloadTemplate} variant="outline" className="rounded-xl px-6 py-5 border-primary/20 hover:bg-primary/5 text-primary font-bold">
+                                <Download className="h-4 w-4 mr-2" /> Download CSV Template
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
 
-                {/* Excel Preview (Direct Import) */}
-                {templateStep === 'preview-excel' && (
-                  <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="p-8 bg-slate-50 border border-slate-200 rounded-2xl text-center">
-                    <FileText className="h-12 w-12 text-primary mx-auto mb-3 opacity-50" />
-                    <h4 className="font-semibold text-slate-900 mb-1">Excel File Ready</h4>
-                    <p className="text-sm text-slate-500 mb-6 max-w-sm mx-auto">
-                      Excel files cannot be previewed on the dashboard, but you can import them directly. We recommend using the CSV format for mapping and previewing.
-                    </p>
-                    <div className="flex justify-center gap-3">
-                      <Button onClick={handleTemplateImport} disabled={templateImporting} className="bg-primary hover:bg-primary/90 py-5 px-8">
-                        {templateImporting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importing...</> : "Import Excel File Now"}
-                      </Button>
-                      <Button variant="outline" onClick={resetTemplate}>Choose Another</Button>
-                    </div>
-                  </motion.div>
-                )}
+                        {/* Step 2: Upload filled template */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 mb-4">
+                            <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500">2</div>
+                            <h4 className="font-bold text-slate-800 uppercase tracking-widest text-[11px]">Upload Filled File</h4>
+                          </div>
+                          <DropZone
+                            accept=".csv,.xls,.xlsx"
+                            onFile={handleTemplateFile}
+                            file={templateFile}
+                            loading={templateParsing}
+                            label="Drop your filled template here"
+                            sublabel="We support CSV, Excel (XLS, XLSX)"
+                          />
+                        </div>
+                      </motion.div>
+                    )}
 
-                {/* Done */}
-                {templateStep === 'done' && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="p-6 bg-green-50 border border-green-200 rounded-2xl text-center"
-                  >
-                    <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
-                    <p className="font-semibold text-green-800 text-lg mb-1">Import Successful!</p>
-                    <p className="text-sm text-green-600 mb-4">Your transactions have been imported.</p>
-                    <Button variant="outline" onClick={resetTemplate} className="rounded-xl">Import More</Button>
-                  </motion.div>
-                )}
-              </div>
-            </TabsContent>
+                    {/* Step 3: Premium Preview */}
+                    {templateStep === 'preview' && templateData && (
+                      <motion.div
+                        key="preview-section"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="space-y-6"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                              <CheckCircle2 className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div>
+                              <h4 className="text-lg font-bold text-slate-900 leading-tight">Review Transactions</h4>
+                              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">{templateData.rows.length} records detected</p>
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={resetTemplate} className="text-slate-400 hover:text-red-500 font-bold tracking-wider">
+                            <X className="h-4 w-4 mr-1" /> CANCEL IMPORT
+                          </Button>
+                        </div>
+                        
+                        <PreviewTable headers={templateData.headers} rows={templateData.rows} />
+                        
+                        <div className="flex items-center gap-4 pt-4 border-t border-slate-100">
+                          <Button
+                            onClick={handleTemplateImport}
+                            disabled={templateImporting}
+                            className="bg-primary hover:bg-primary/90 text-white px-10 py-6 rounded-2xl text-base font-bold shadow-xl shadow-primary/20"
+                          >
+                            {templateImporting ? (
+                              <><Loader2 className="h-5 w-5 mr-3 animate-spin" /> Finalizing Import...</>
+                            ) : (
+                              <><CheckCircle2 className="h-5 w-5 mr-3" /> Confirm Import</>
+                            )}
+                          </Button>
+                          <Button variant="outline" onClick={resetTemplate} className="rounded-2xl py-6 px-8 border-slate-200 text-slate-500 font-bold hover:bg-slate-50 transition-all">
+                            Discard
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+
+
+
+                    {/* Completion State */}
+                    {templateStep === 'done' && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="py-16 bg-green-50/50 border-2 border-dashed border-green-200 rounded-[40px] text-center"
+                      >
+                        <div className="h-24 w-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-200">
+                          <CheckCircle2 className="h-12 w-12 text-white" />
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-900 mb-2">Transactions Imported!</h3>
+                        <p className="text-green-700/80 font-medium mb-10">All records have been successfully added to the ledger.</p>
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 px-6">
+                          <Button onClick={() => navigate('/transactions')} className="w-full sm:w-auto bg-slate-900 hover:bg-black text-white px-10 py-6 rounded-2xl font-bold h-auto shadow-xl transition-all hover:scale-105 active:scale-95">
+                            <ArrowRight className="h-5 w-5 mr-2" /> View Transactions
+                          </Button>
+                          <Button onClick={resetTemplate} variant="outline" className="w-full sm:w-auto border-slate-200 text-slate-600 px-10 py-6 rounded-2xl font-bold h-auto hover:bg-slate-50">
+                            Import More
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </TabsContent>
 
               {/* Import CSV / Excel */}
               <TabsContent value="csv" className="mt-0 focus-visible:ring-0 outline-none">
                 <div className="space-y-8">
                   <div className="flex items-center gap-3 pb-2">
                     <div className="h-10 w-1 rounded-full bg-primary mb-0" />
-                    <h3 className="text-xl font-bold text-slate-800">Import CSV & Excel</h3>
+                    <h3 className="text-xl font-bold text-slate-800">Universal CSV & Excel Import</h3>
                   </div>
                   {renderAccountSelector()}
 
-                {csvStep === 'upload' && (
-                  <>
-                    <DropZone
-                      accept=".csv,.xls,.xlsx"
-                      onFile={handleCsvFile}
-                      file={csvFile}
-                      loading={csvParsing}
-                      label="Drag & drop your CSV or Excel file"
-                      sublabel="CSV, XLS, or XLSX files supported"
-                    />
-                    <div className="p-4 bg-blue-50/80 border border-blue-100 rounded-xl flex items-start gap-3">
-                      <Info className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
-                      <div className="text-sm text-blue-800">
-                        <p className="font-medium mb-1">Smart Column Detection</p>
-                        <p>We'll automatically detect your columns. If we can't match them, you'll be able to map them manually.</p>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {csvStep === 'preview' && csvData && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-slate-800">
-                        Import Preview ({csvData.rows.length} transactions)
-                      </h4>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => setCsvMappingOpen(true)}>
-                          <GripVertical className="h-4 w-4 mr-1" /> Edit Mapping
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={resetCsv}>
-                          <X className="h-4 w-4 mr-1" /> Reset
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Column mapping pills */}
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {csvData.headers.map((h, i) => {
-                        const mapped = csvMapping[h];
-                        return (
-                          <span
-                            key={i}
-                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium
-                              ${mapped
-                                ? 'bg-primary/10 text-primary border border-primary/20'
-                                : 'bg-slate-100 text-slate-500 border border-slate-200'}`}
-                          >
-                            {h}
-                            {mapped && <><ArrowRight className="h-3 w-3" />{mapped}</>}
-                          </span>
-                        );
-                      })}
-                    </div>
-
-                    <PreviewTable headers={getMappedPreviewData().headers} rows={getMappedPreviewData().rows} />
-
-                    <div className="flex gap-3 mt-4">
-                      <Button
-                        onClick={handleCsvImport}
-                        disabled={csvImporting}
-                        className="bg-primary hover:bg-primary/90 text-white px-8 py-5 rounded-xl"
+                  <AnimatePresence mode="wait">
+                    {csvStep === 'upload' && (
+                      <motion.div
+                        key="csv-upload"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        className="space-y-6"
                       >
-                        {csvImporting ? (
-                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importing...</>
-                        ) : (
-                          <><CheckCircle2 className="h-4 w-4 mr-2" /> Confirm Import</>
-                        )}
-                      </Button>
-                      <Button variant="outline" onClick={resetCsv} className="rounded-xl py-5">Cancel</Button>
-                    </div>
-                  </motion.div>
-                )}
+                        <DropZone
+                          accept=".csv,.xls,.xlsx"
+                          onFile={handleCsvFile}
+                          file={csvFile || (csvFileMeta ? { name: csvFileMeta.name, size: csvFileMeta.size, isGhost: true } : null)}
+                          loading={csvParsing}
+                          label="Upload your bank statement or ledger"
+                          sublabel="Auto-maps headers for Date, Description, and Amount"
+                        />
+                        <div className="p-6 bg-blue-50/50 border-2 border-dashed border-blue-100 rounded-[32px] flex items-start gap-4">
+                          <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-blue-100">
+                            <Info className="h-5 w-5 text-blue-500" />
+                          </div>
+                          <div className="text-sm">
+                            <p className="font-black text-blue-900 uppercase tracking-widest text-[10px] mb-1">Smart Engine Active</p>
+                            <p className="text-blue-800/70 leading-relaxed font-medium">
+                              Our engine will automatically detect and match columns for your statement. You can refine the mapping in the next step.
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
 
-                {/* Excel Preview Fallback */}
-                {csvStep === 'preview-excel' && (
-                  <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="p-8 bg-slate-50 border border-slate-200 rounded-2xl text-center">
-                    <FileSpreadsheet className="h-12 w-12 text-primary mx-auto mb-3 opacity-50" />
-                    <h4 className="font-semibold text-slate-900 mb-1">Spreadsheet Ready</h4>
-                    <p className="text-sm text-slate-500 mb-6 max-w-sm mx-auto">
-                      Direct preview for Excel is coming soon. You can import the file directly now, or convert it to CSV to map your columns manually.
-                    </p>
-                    <div className="flex justify-center gap-3">
-                      <Button onClick={handleCsvImport} disabled={csvImporting} className="bg-primary hover:bg-primary/90 py-5 px-8">
-                        {csvImporting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importing...</> : "Import Spreadsheet Now"}
-                      </Button>
-                      <Button variant="outline" onClick={resetCsv}>Choose Another</Button>
-                    </div>
-                  </motion.div>
-                )}
+                    {csvStep === 'preview' && csvData && (
+                      <motion.div
+                        key="csv-preview"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="space-y-6"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+                              <FileSpreadsheet className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                              <h4 className="text-xl font-bold text-slate-900 leading-tight">Validate Transactions</h4>
+                              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{csvData.rows.length} entries to be posted</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setCsvMappingOpen(true)} className="rounded-xl border-slate-200 font-bold hover:bg-primary hover:text-white hover:border-primary transition-all px-4">
+                              <GripVertical className="h-4 w-4 mr-2" /> Edit Mapping
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={resetCsv} className="text-slate-400 hover:text-red-500 font-black text-[10px] tracking-widest px-4">
+                              <X className="h-4 w-4 mr-1" /> CANCEL
+                            </Button>
+                          </div>
+                        </div>
 
-                {csvStep === 'done' && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="p-6 bg-green-50 border border-green-200 rounded-2xl text-center"
-                  >
-                    <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
-                    <p className="font-semibold text-green-800 text-lg mb-1">Import Successful!</p>
-                    <p className="text-sm text-green-600 mb-4">Your transactions have been imported.</p>
-                    <Button variant="outline" onClick={resetCsv} className="rounded-xl">Import More</Button>
-                  </motion.div>
-                )}
+                        {/* Column mapping pills */}
+                        <div className="flex flex-wrap gap-2 p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+                          {csvData.headers.map((h, i) => {
+                            const mapped = csvMapping[h];
+                            return (
+                              <span
+                                key={i}
+                                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[10px] font-black tracking-widest
+                                  ${mapped
+                                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                                    : 'bg-white text-slate-400 border border-slate-200 shadow-sm'}`}
+                              >
+                                {h.toUpperCase()}
+                                {mapped && <><ArrowRight className="h-3 w-3 opacity-50" />{mapped.toUpperCase()}</>}
+                              </span>
+                            );
+                          })}
+                        </div>
 
-                {/* Column Mapping Modal */}
-                <ColumnMappingModal
-                  open={csvMappingOpen}
-                  onClose={() => setCsvMappingOpen(false)}
-                  fileHeaders={csvData?.headers || []}
-                  mapping={csvMapping}
-                  setMapping={setCsvMapping}
-                  customFields={csvCustomFields}
-                  setCustomFields={setCsvCustomFields}
-                  onConfirm={() => { setCsvMappingOpen(false); setCsvStep('preview'); }}
-                />
-              </div>
-            </TabsContent>
+                        <PreviewTable headers={csvData.headers} rows={csvData.rows} mapping={csvMapping} />
+
+                        <div className="flex gap-4 pt-6 border-t border-slate-100">
+                          <Button
+                            onClick={handleCsvImport}
+                            disabled={csvImporting || !selectedAccount}
+                            className={`bg-primary hover:bg-primary/90 text-white px-10 py-6 rounded-2xl text-base font-bold shadow-xl shadow-primary/20 ${!selectedAccount ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
+                          >
+                            {csvImporting ? (
+                              <><Loader2 className="h-5 w-5 mr-3 animate-spin" /> Posting Records...</>
+                            ) : (
+                              <><CheckCircle2 className="h-5 w-5 mr-3" /> Finalize & Import</>
+                            )}
+                          </Button>
+                          {!selectedAccount && (
+                            <p className="text-red-500 text-xs font-bold uppercase tracking-widest flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" /> Select a bank account first
+                            </p>
+                          )}
+                          <Button variant="outline" onClick={resetCsv} className="rounded-2xl py-6 px-8 border-slate-200 text-slate-500 font-bold">Discard</Button>
+                        </div>
+                      </motion.div>
+                    )}
+
+
+
+                    {csvStep === 'done' && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="py-16 bg-blue-50/50 border-2 border-dashed border-blue-200 rounded-[40px] text-center"
+                      >
+                        <div className="h-24 w-24 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-blue-200">
+                          <CheckCircle2 className="h-12 w-12 text-white" />
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-900 mb-2">Ledger Updated!</h3>
+                        <p className="text-blue-700/80 font-medium mb-10">Your CSV data has been successfully processed and posted.</p>
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 px-6">
+                          <Button onClick={() => navigate('/transactions')} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-10 py-6 rounded-2xl font-bold h-auto shadow-xl shadow-blue-200 transition-all hover:scale-105 active:scale-95">
+                            <ArrowRight className="h-5 w-5 mr-2" /> View Transactions
+                          </Button>
+                          <Button onClick={resetCsv} variant="outline" className="w-full sm:w-auto border-blue-100 text-blue-700 px-10 py-6 rounded-2xl font-bold h-auto hover:bg-blue-50">
+                            Finish
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Column Mapping Modal */}
+                  <ColumnMappingModal
+                    open={csvMappingOpen}
+                    onClose={() => setCsvMappingOpen(false)}
+                    fileHeaders={csvData?.headers || []}
+                    mapping={csvMapping}
+                    setMapping={setCsvMapping}
+                    customFields={csvCustomFields}
+                    setCustomFields={setCsvCustomFields}
+                    onConfirm={() => { setCsvMappingOpen(false); setCsvStep('preview'); }}
+                  />
+                </div>
+              </TabsContent>
 
               {/* Bank Statement (PDF) */}
               <TabsContent value="pdf" className="mt-0 focus-visible:ring-0 outline-none">
@@ -1137,8 +1690,15 @@ const AddTransactions = () => {
                   >
                     <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
                     <p className="font-semibold text-green-800 text-lg mb-1">Import Successful!</p>
-                    <p className="text-sm text-green-600 mb-4">Transactions extracted from PDF and imported.</p>
-                    <Button variant="outline" onClick={resetPdf} className="rounded-xl">Import Another Statement</Button>
+                    <p className="text-sm text-green-600 mb-6">Transactions extracted from PDF and imported.</p>
+                    <div className="flex flex-col gap-3 max-w-[280px] mx-auto">
+                      <Button onClick={() => navigate('/transactions')} className="bg-green-600 hover:bg-green-700 text-white py-5 rounded-xl font-bold shadow-lg shadow-green-100">
+                        View in Transactions
+                      </Button>
+                      <Button variant="outline" onClick={resetPdf} className="rounded-xl border-green-200 text-green-700 hover:bg-green-100/50">
+                        Import Another Statement
+                      </Button>
+                    </div>
                   </motion.div>
                 )}
               </div>
@@ -1147,6 +1707,86 @@ const AddTransactions = () => {
           </AnimatePresence>
         </Tabs>
       </motion.div>
+
+      {/* Discard Changes Popups */}
+      <ConfirmPopup 
+        open={blocker.state === "blocked" || !!pendingTab}
+        onClose={cancelDiscard}
+        onConfirm={confirmDiscard}
+        title="Discard Changes?"
+        description="You have an active operation in progress. If you leave now, your session data and previews will be lost."
+      />
+      {/* Balance Mismatch Popup */}
+      <Dialog open={!!mismatchData} onOpenChange={(val) => !val && setMismatchData(null)}>
+        <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden border-0 rounded-[40px] bg-white shadow-2xl">
+          <div className="p-10">
+            <div className="h-20 w-20 bg-amber-50 rounded-[32px] flex items-center justify-center border-2 border-amber-100 shadow-xl shadow-amber-50/50 mb-8 mx-auto">
+              <AlertTriangle className="h-10 w-10 text-amber-500" />
+            </div>
+            
+            <DialogHeader className="text-center space-y-4 mb-10">
+              <DialogTitle className="text-3xl font-black text-slate-900 leading-tight">
+                Balance Mismatch!
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 font-medium text-lg leading-relaxed px-4">
+                The balance in your record doesn't match the calculated ledger balance.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 mb-10">
+              <div className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                <span className="text-slate-500 font-bold uppercase tracking-widest text-[11px]">Calculated Balance</span>
+                <span className="text-slate-900 font-black text-lg">₹{mismatchData?.calculated?.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex items-center justify-center h-4 relative">
+                <div className="absolute inset-x-0 h-[2px] bg-slate-100" />
+                <div className="relative bg-white px-4 text-[10px] font-black text-amber-500 uppercase tracking-[4px]">VS</div>
+              </div>
+              <div className="flex items-center justify-between p-5 bg-amber-50 rounded-2xl border border-amber-200">
+                <span className="text-amber-700 font-bold uppercase tracking-widest text-[11px]">Provided Balance</span>
+                <span className="text-amber-900 font-black text-lg">₹{mismatchData?.provided?.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            <p className="text-center text-slate-400 text-sm font-medium mb-10 px-6">
+              Would you like to force update your account balance to <span className="text-slate-900 font-bold">₹{mismatchData?.provided?.toLocaleString('en-IN')}</span> and continue?
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Button
+                variant="outline"
+                onClick={() => setMismatchData(null)}
+                className="py-6 rounded-2xl border-slate-200 text-slate-500 font-bold hover:bg-slate-50 transition-all h-auto"
+              >
+                Discard
+              </Button>
+              <Button
+                disabled={mismatchConfirming}
+                onClick={async () => {
+                   setMismatchConfirming(true);
+                   try {
+                     if (mismatchData.source === 'manual') {
+                       await handleManualSubmit(null, true);
+                     } else if (mismatchData.source === 'csv') {
+                       await handleCsvImport(true);
+                     } else if (mismatchData.source === 'template') {
+                       await handleTemplateImport(true);
+                     } else if (mismatchData.source === 'pdf') {
+                       await handlePdfImport(true);
+                     }
+                   } finally {
+                     setMismatchConfirming(false);
+                     setMismatchData(null);
+                   }
+                }}
+                className="py-6 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-xl shadow-amber-200 transition-all h-auto"
+              >
+                {mismatchConfirming ? <Loader2 className="animate-spin" /> : "Update Balance"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

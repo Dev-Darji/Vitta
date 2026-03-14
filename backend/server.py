@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, status
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -115,6 +116,7 @@ class TokenResponse(BaseModel):
 class BankAccountCreate(BaseModel):
     account_name: str
     bank_name: str
+    category: Optional[str] = None
     opening_balance: float = 0.0
 
 class BankAccount(BaseModel):
@@ -123,8 +125,15 @@ class BankAccount(BaseModel):
     user_id: str
     account_name: str
     bank_name: str
+    category: Optional[str] = None
     balance: float
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class BankAccountUpdate(BaseModel):
+    account_name: Optional[str] = None
+    bank_name: Optional[str] = None
+    category: Optional[str] = None
+    balance: Optional[float] = None
 
 class CategoryCreate(BaseModel):
     name: str
@@ -205,6 +214,50 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user['created_at'] = datetime.fromisoformat(user['created_at'])
     
     return User(**user)
+
+# ==================== UTILITIES ====================
+
+# Keywords for identifying transaction headers in bank statements
+header_keywords = {
+    "Date": ["date", "transaction date", "value date", "posting date"],
+    "Description": ["description", "particulars", "transaction description"],
+    "Amount": ["amount", "debit", "credit", "withdrawal", "deposit", "txn amount"],
+    "Debit": ["debit", "withdrawal", "dr"],
+    "Credit": ["credit", "deposit", "cr"],
+    "Balance": ["balance", "closing balance"],
+    "Cheque Number": ["cheque number", "cheque no", "chq no", "cheque #", "chq number"],
+    "Reference": ["reference", "ref no", "reference no", "reference number", "chq/ref no"],
+    "Branch": ["branch", "branch name"]
+}
+
+def normalize_date(date_str):
+    if not date_str or not isinstance(date_str, str):
+        return date_str
+    
+    date_str = date_str.strip()
+    # Try common formats
+    formats = [
+        "%d-%m-%Y", "%d/%m/%Y", "%d.%m.%Y",
+        "%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d",
+        "%d %b %Y", "%d %B %Y",
+        "%b %d %Y", "%B %d %Y",
+        "%m-%d-%Y", "%m/%d/%Y" # Less common in India but possible
+    ]
+    
+    # Handle timestamp strings like "2024-03-14 00:00:00"
+    if " " in date_str and ":" in date_str:
+        date_part = date_str.split(" ")[0]
+    else:
+        date_part = date_str
+
+    for fmt in formats:
+        try:
+            dt = datetime.strptime(date_part, fmt)
+            return dt.strftime("%d-%m-%Y")
+        except ValueError:
+            continue
+            
+    return date_str # Return as is if no format works
 
 # ==================== AUTH ROUTES ====================
 
@@ -332,6 +385,7 @@ async def create_account(account_data: BankAccountCreate, current_user: User = D
         user_id=current_user.id,
         account_name=account_data.account_name,
         bank_name=account_data.bank_name,
+        category=account_data.category,
         balance=account_data.opening_balance
     )
     
@@ -357,6 +411,22 @@ async def delete_account(account_id: str, current_user: User = Depends(get_curre
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Account not found")
     return {"message": "Account deleted successfully"}
+
+@api_router.put("/accounts/{account_id}")
+async def update_account(account_id: str, account_data: BankAccountUpdate, current_user: User = Depends(get_current_user)):
+    update_dict = account_data.model_dump(exclude_unset=True)
+    if not update_dict:
+        return {"message": "No changes to update"}
+    
+    result = await db.accounts.update_one(
+        {"id": account_id, "user_id": current_user.id},
+        {"$set": update_dict}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Account not found")
+        
+    return {"message": "Account updated successfully"}
 
 # ==================== CATEGORY ROUTES ====================
 
@@ -411,6 +481,9 @@ async def create_transaction(transaction_data: TransactionCreate, current_user: 
         category_id=transaction_data.category_id
     )
     
+    if transaction.date:
+        transaction.date = normalize_date(transaction.date)
+    
     transaction_dict = transaction.model_dump()
     transaction_dict['created_at'] = transaction_dict['created_at'].isoformat()
     
@@ -446,8 +519,15 @@ async def get_transactions(
     if type:
         query["type"] = type
     
-    transactions = await db.transactions.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
+    transactions = await db.transactions.find(query, {"_id": 0}).to_list(1000)
     
+    # Sort in memory since we are using DD-MM-YYYY string format
+    try:
+        transactions.sort(key=lambda x: datetime.strptime(x['date'], '%d-%m-%Y'), reverse=True)
+    except:
+        # Fallback to default sort if some dates are malformed
+        pass
+
     for txn in transactions:
         if isinstance(txn.get('created_at'), str):
             txn['created_at'] = datetime.fromisoformat(txn['created_at'])
@@ -506,10 +586,11 @@ async def delete_transaction(transaction_id: str, current_user: User = Depends(g
 async def import_csv(
     file: UploadFile = File(...),
     account_id: str = None,
+    force_balance: bool = False,
     current_user: User = Depends(get_current_user)
 ):
-    if not file.filename.endswith(('.csv', '.pdf')):
-        raise HTTPException(status_code=400, detail="Only CSV and PDF files are supported")
+    if not file.filename.lower().endswith(('.csv', '.pdf', '.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Only CSV, Excel, and PDF files are supported")
     
     if not account_id:
         raise HTTPException(status_code=400, detail="Account ID is required")
@@ -591,11 +672,13 @@ async def import_csv(
                                     dr_amount = relevant_amounts[0]
                                 
                                 if dr_amount or cr_amount:
+                                    balance_val = amounts[-1] if len(amounts) > 2 else None
                                     transactions_data.append({
-                                        'Txn Date': date_str,
+                                        'Txn Date': normalize_date(date_str),
                                         'Description': description,
                                         'Dr Amount': dr_amount,
-                                        'Cr Amount': cr_amount
+                                        'Cr Amount': cr_amount,
+                                        'Balance': balance_val
                                     })
                                     logging.debug(f"Found transaction: {date_str} | {description} | Dr:{dr_amount} | Cr:{cr_amount}")
                 
@@ -616,9 +699,17 @@ async def import_csv(
             except Exception as e:
                 logging.error(f"Error parsing PDF: {e}")
                 raise HTTPException(status_code=400, detail=f"Error parsing PDF: {str(e)}")
+        elif file.filename.lower().endswith(('.xlsx', '.xls')):
+            # Handle Excel files
+            df = pd.read_excel(io.BytesIO(contents))
         else:
             # Handle CSV files
-            df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+            try:
+                # Try UTF-8 first
+                df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+            except UnicodeDecodeError:
+                # Fallback to latin-1
+                df = pd.read_csv(io.StringIO(contents.decode('latin-1')))
         
         # Expected columns: Date, Description, Debit, Credit
         # Flexible column matching
@@ -626,6 +717,7 @@ async def import_csv(
         desc_col = None
         debit_col = None
         credit_col = None
+        balance_col = None
         
         for col in df.columns:
             col_lower = col.lower().strip()
@@ -633,10 +725,10 @@ async def import_csv(
                 date_col = col
             elif 'description' in col_lower or 'narration' in col_lower or 'particulars' in col_lower:
                 desc_col = col
-            elif 'dr' in col_lower or 'debit' in col_lower or 'withdrawal' in col_lower:
-                debit_col = col
             elif 'cr' in col_lower or 'credit' in col_lower or 'deposit' in col_lower:
                 credit_col = col
+            elif 'balance' in col_lower or 'closing' in col_lower:
+                balance_col = col
         
         if not all([date_col, desc_col]):
             raise HTTPException(status_code=400, detail=f"CSV must have Date and Description columns. Found columns: {list(df.columns)}")
@@ -646,7 +738,29 @@ async def import_csv(
         categories = await db.categories.find({"user_id": current_user.id}, {"_id": 0}).to_list(1000)
         
         # Log detected columns for debugging
-        logging.info(f"Detected columns - Date: {date_col}, Desc: {desc_col}, Debit: {debit_col}, Credit: {credit_col}")
+        logging.info(f"Detected columns - Date: {date_col}, Desc: {desc_col}, Debit: {debit_col}, Credit: {credit_col}, Balance: {balance_col}")
+        
+        # Balance Verification Logic
+        if balance_col and not force_balance and not df.empty:
+            provided_final = float(df.iloc[-1][balance_col])
+            
+            # Calculate expected delta
+            delta = 0
+            for _, row in df.iterrows():
+                row_debit = float(row[debit_col]) if debit_col and pd.notnull(row[debit_col]) else 0
+                row_credit = float(row[credit_col]) if credit_col and pd.notnull(row[credit_col]) else 0
+                delta += (row_credit - row_debit)
+            
+            expected_final = float(account['balance']) + delta
+            if abs(expected_final - provided_final) > 0.01:
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "detail": "Balance Mismatch detected in import statement",
+                        "calculated": expected_final,
+                        "provided": provided_final
+                    }
+                )
         
         for _, row in df.iterrows():
             try:
@@ -696,12 +810,15 @@ async def import_csv(
                 transaction = Transaction(
                     user_id=current_user.id,
                     account_id=account_id,
-                    date=date_str,
+                    date=normalize_date(date_str),
                     description=description,
                     amount=amount,
                     type=transaction_type,
                     category_id=category_id
                 )
+                
+                if transaction.date:
+                    transaction.date = normalize_date(transaction.date)
                 
                 transaction_dict = transaction.model_dump()
                 transaction_dict['created_at'] = transaction_dict['created_at'].isoformat()

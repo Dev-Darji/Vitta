@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Upload, CreditCard, BarChart3, Tag, Wallet, Settings, LogOut, Menu, PlusCircle } from 'lucide-react';
+import { LayoutDashboard, Upload, CreditCard, BarChart3, Tag, Wallet, Settings, LogOut, Menu, PlusCircle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import UTooltip from '@/components/UTooltip';
 
 const DashboardLayout = ({ children }) => {
   const navigate = useNavigate();
@@ -34,8 +35,8 @@ const DashboardLayout = ({ children }) => {
           {/* Logo */}
           <div className="h-16 border-b border-slate-200 flex items-center px-6">
             <Link to="/dashboard" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">V</span>
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
+                <span className="text-white font-bold text-lg leading-none transform -translate-y-[0.5px]">V</span>
               </div>
               <span className="font-heading font-bold text-xl text-primary">Vitta</span>
             </Link>
@@ -109,9 +110,18 @@ const DashboardLayout = ({ children }) => {
           >
             <Menu className="h-6 w-6 text-slate-700" />
           </button>
-          <h1 className="text-xl font-heading font-semibold text-primary">
-            {menuItems.find(item => item.path === location.pathname)?.label || 'Dashboard'}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-heading font-semibold text-primary leading-tight">
+              {menuItems.find(item => item.path === location.pathname)?.label || 'Dashboard'}
+            </h1>
+            {location.pathname === '/import' && (
+              <UTooltip content="Add or import transactions using multiple methods" side="right">
+                <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center cursor-pointer hover:bg-slate-200 transition-colors">
+                  <Info className="h-3 w-3 text-slate-500" />
+                </div>
+              </UTooltip>
+            )}
+          </div>
         </header>
 
         {/* Content */}

@@ -9,7 +9,7 @@ export const Footer = () => {
           <div>
             <div className="flex items-center space-x-2 mb-4">
               <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center">
-                <span className="text-primary font-bold text-lg">V</span>
+                <span className="text-primary font-bold text-lg leading-none transform -translate-y-[0.5px]">V</span>
               </div>
               <span className="font-heading font-bold text-xl">Vitta</span>
             </div>

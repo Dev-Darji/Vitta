@@ -77,7 +77,7 @@ export const Navbar = () => {
                     shouldShowSolid ? 'bg-primary shadow-primary/10' : 'bg-accent shadow-accent/20'
                   }`}
                 >
-                  <span className={`font-black text-lg italic ${shouldShowSolid ? 'text-accent' : 'text-primary'}`}>V</span>
+                <span className={`font-black text-lg italic leading-none transform -translate-x-[1px] -translate-y-[0.5px] ${shouldShowSolid ? 'text-accent' : 'text-primary'}`}>V</span>
                 </motion.div>
                 <span className={`font-heading font-black text-xl tracking-tighter transition-colors duration-500 ${
                   shouldShowSolid ? 'text-primary' : 'text-white' 
