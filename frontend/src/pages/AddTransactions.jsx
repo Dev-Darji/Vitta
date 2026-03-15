@@ -678,7 +678,7 @@ const AddTransactions = () => {
         account_id: selectedAccount,
         date: manualForm.date,
         description: manualForm.description.trim(),
-        amount: amount,
+        amount: Number(manualForm.amount),
         type: manualForm.type,
         category_id: manualForm.category_id || null,
         metadata: manualCustomFields.reduce((acc, curr) => {
@@ -688,8 +688,8 @@ const AddTransactions = () => {
       };
 
       // If we are forcing balance, we might need a backend update for account balance too
-      if (force && providedBalance !== null) {
-        await api.put(`/accounts/${selectedAccount}`, { balance: providedBalance });
+      if (force && manualForm.balance !== null && manualForm.balance !== '') {
+        await api.put(`/accounts/${selectedAccount}`, { balance: Number(manualForm.balance) });
       }
       const res = await api.post('/transactions', payload);
       
@@ -761,7 +761,7 @@ const AddTransactions = () => {
     } finally { setTemplateParsing(false); }
   };
 
-  const handleTemplateImport = async () => {
+  const handleTemplateImport = async (force = false) => {
     if (!selectedAccount) return;
     if (!templateFile) {
       toast.error('Session restored from refresh. Please re-upload the file to proceed with the import.', {

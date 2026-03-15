@@ -156,6 +156,7 @@ class TransactionCreate(BaseModel):
     amount: float
     type: str  # "debit" or "credit"
     category_id: Optional[str] = None
+    metadata: Optional[dict] = None
 
 class Transaction(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -167,6 +168,7 @@ class Transaction(BaseModel):
     amount: float
     type: str
     category_id: Optional[str] = None
+    metadata: Optional[dict] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class TransactionUpdate(BaseModel):
@@ -478,7 +480,8 @@ async def create_transaction(transaction_data: TransactionCreate, current_user: 
         description=transaction_data.description,
         amount=transaction_data.amount,
         type=transaction_data.type,
-        category_id=transaction_data.category_id
+        category_id=transaction_data.category_id,
+        metadata=transaction_data.metadata
     )
     
     if transaction.date:
