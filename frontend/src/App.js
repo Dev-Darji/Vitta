@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import '@/App.css';
 
 // Public Pages
@@ -19,6 +20,7 @@ import Transactions from '@/pages/Transactions';
 import Reports from '@/pages/Reports';
 import Categories from '@/pages/Categories';
 import Accounts from '@/pages/Accounts';
+import Clients from '@/pages/Clients';
 import Settings from '@/pages/Settings';
 import ErrorPage from '@/pages/ErrorPage';
 
@@ -74,6 +76,7 @@ const router = createBrowserRouter([
           { path: "/reports", element: <Reports /> },
           { path: "/categories", element: <Categories /> },
           { path: "/accounts", element: <Accounts /> },
+          { path: "/clients", element: <Clients /> },
           { path: "/settings", element: <Settings /> },
         ]
       }
@@ -84,8 +87,10 @@ const router = createBrowserRouter([
 function App() {
   return (
     <div className="App">
-      <RouterProvider router={router} />
-      <Toaster position="top-right" />
+      <TooltipProvider>
+        <RouterProvider router={router} />
+        <Toaster position="top-right" />
+      </TooltipProvider>
     </div>
   );
 }

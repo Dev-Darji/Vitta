@@ -28,7 +28,7 @@ const Categories = () => {
       const response = await api.get('/categories');
       setCategories(response.data);
     } catch (error) {
-      toast.error('Failed to load categories');
+      toast.error('Failed to load groups');
     } finally {
       setLoading(false);
     }
@@ -38,24 +38,24 @@ const Categories = () => {
     e.preventDefault();
     try {
       await api.post('/categories', newCategory);
-      toast.success('Category created');
+      toast.success('Group created');
       setIsOpen(false);
       setNewCategory({ name: '', type: 'expense', color: '#0F392B' });
       fetchCategories();
     } catch (error) {
-      toast.error('Failed to create category');
+      toast.error('Failed to create group');
     }
   };
 
   const handleDeleteCategory = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this category?')) return;
+    if (!window.confirm('Are you sure you want to delete this group?')) return;
 
     try {
       await api.delete(`/categories/${id}`);
-      toast.success('Category deleted');
+      toast.success('Group deleted');
       fetchCategories();
     } catch (error) {
-      toast.error('Failed to delete category');
+      toast.error('Failed to delete group');
     }
   };
 
@@ -63,25 +63,25 @@ const Categories = () => {
   const expenseCategories = categories.filter((c) => c.type === 'expense');
 
   return (
-    <div data-testid="categories-page" className="space-y-6">
+    <div data-testid="groups-page" className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="font-heading font-bold text-2xl text-primary">Categories</h2>
+        <h2 className="font-heading font-bold text-2xl text-primary">Groups</h2>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="add-category-button" className="bg-primary hover:bg-primary/90 text-white">
+            <Button data-testid="add-group-button" className="bg-primary hover:bg-primary/90 text-white">
               <Plus className="h-4 w-4 mr-2" />
-              Add Category
+              Add Group
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create New Category</DialogTitle>
+              <DialogTitle>Create New Group</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleCreateCategory} className="space-y-4">
               <div>
-                <Label>Category Name</Label>
+                <Label>Group Name</Label>
                 <Input
-                  data-testid="category-name-input"
+                  data-testid="group-name-input"
                   value={newCategory.name}
                   onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
                   required
@@ -108,8 +108,8 @@ const Categories = () => {
                   onChange={(e) => setNewCategory({ ...newCategory, color: e.target.value })}
                 />
               </div>
-              <Button data-testid="create-category-submit" type="submit" className="w-full">
-                Create Category
+              <Button data-testid="create-group-submit" type="submit" className="w-full">
+                Create Group
               </Button>
             </form>
           </DialogContent>
@@ -124,9 +124,9 @@ const Categories = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm"
+            className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm"
           >
-            <h3 className="font-heading font-semibold text-lg text-primary mb-4">Income Categories</h3>
+            <h3 className="font-heading font-semibold text-lg text-primary mb-4">Income Groups</h3>
             <div className="space-y-3">
               {incomeCategories.length > 0 ? (
                 incomeCategories.map((category) => (
@@ -146,7 +146,7 @@ const Categories = () => {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-slate-500 text-center py-8">No income categories</p>
+                <p className="text-sm text-slate-500 text-center py-8">No income groups</p>
               )}
             </div>
           </motion.div>
@@ -156,9 +156,9 @@ const Categories = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm"
+            className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm"
           >
-            <h3 className="font-heading font-semibold text-lg text-primary mb-4">Expense Categories</h3>
+            <h3 className="font-heading font-semibold text-lg text-primary mb-4">Expense Groups</h3>
             <div className="space-y-3">
               {expenseCategories.length > 0 ? (
                 expenseCategories.map((category) => (
@@ -178,7 +178,7 @@ const Categories = () => {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-slate-500 text-center py-8">No expense categories</p>
+                <p className="text-sm text-slate-500 text-center py-8">No expense groups</p>
               )}
             </div>
           </motion.div>

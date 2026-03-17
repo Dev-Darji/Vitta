@@ -42,8 +42,8 @@ const FAQ = () => {
             icon: <Globe className="w-5 h-5 text-accent" />,
             items: [
                 {
-                    question: 'How accurate is the categorization?',
-                    answer: 'Our proprietary AI engine analyzes transaction descriptions and matches them against thousands of merchant patterns, achieving up to 98% accuracy.'
+                    question: 'How accurate is the grouping?',
+                    answer: 'Our proprietary AI engine analyzes transaction particulars and matches them against thousands of merchant patterns, achieving up to 98% accuracy.'
                 },
                 {
                     question: 'Can I export my reports?',

@@ -8,7 +8,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
 # --- FIX FOR PASSLIB/BCRYPT COMPATIBILITY ---
@@ -66,7 +66,7 @@ app = FastAPI()
 # Add CORS middleware IMMEDIATELY after creating app to ensure it wraps everything
 cors_origins_str = get_env('CORS_ORIGINS', 'http://localhost:3000,https://vitta-theta.vercel.app')
 allowed_origins = [origin.strip() for origin in cors_origins_str.split(',') if origin.strip()]
-extra_origins = ["https://vitta-theta.vercel.app", "http://localhost:3000"]
+extra_origins = ["https://vitta-theta.vercel.app", "http://localhost:3000", "http://localhost:3001"]
 for origin in extra_origins:
     if origin not in allowed_origins:
         allowed_origins.append(origin)
@@ -108,32 +108,65 @@ class User(BaseModel):
     business_name: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class ClientCreate(BaseModel):
+    name: str
+    business_type: Optional[str] = None
+    currency: str = "INR"
+    country: str = "India"
+    notes: Optional[str] = None
+
+class Client(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    name: str
+    business_type: Optional[str] = None
+    currency: str
+    country: str
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: User
 
 class BankAccountCreate(BaseModel):
+    client_id: str
     account_name: str
-    bank_name: str
-    category: Optional[str] = None
+    account_type: str # "Bank", "Cash", "Card"
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
     opening_balance: float = 0.0
+    opening_balance_date: str
+    currency: str = "INR"
+    notes: Optional[str] = None
 
 class BankAccount(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
+    client_id: str
     account_name: str
-    bank_name: str
-    category: Optional[str] = None
+    account_type: str
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
     balance: float
+    opening_balance: float
+    opening_balance_date: str
+    currency: str
+    notes: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class BankAccountUpdate(BaseModel):
     account_name: Optional[str] = None
+    account_type: Optional[str] = None
     bank_name: Optional[str] = None
-    category: Optional[str] = None
+    account_number: Optional[str] = None
+    opening_balance: Optional[float] = None
+    opening_balance_date: Optional[str] = None
     balance: Optional[float] = None
+    notes: Optional[str] = None
 
 class CategoryCreate(BaseModel):
     name: str
@@ -152,10 +185,15 @@ class Category(BaseModel):
 class TransactionCreate(BaseModel):
     account_id: str
     date: str
-    description: str
+    description: str # Particulars
     amount: float
-    type: str  # "debit" or "credit"
-    category_id: Optional[str] = None
+    type: str  # "debit" (out) or "credit" (in)
+    category_id: Optional[str] = None # Group ID
+    ledger_name: Optional[str] = None
+    group_name: Optional[str] = None
+    reference_number: Optional[str] = None
+    cheque_number: Optional[str] = None
+    notes: Optional[str] = None
     metadata: Optional[dict] = None
 
 class Transaction(BaseModel):
@@ -168,12 +206,27 @@ class Transaction(BaseModel):
     amount: float
     type: str
     category_id: Optional[str] = None
+    ledger_name: Optional[str] = None
+    group_name: Optional[str] = None
+    reference_number: Optional[str] = None
+    cheque_number: Optional[str] = None
+    notes: Optional[str] = None
     metadata: Optional[dict] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class TransactionUpdate(BaseModel):
-    category_id: Optional[str] = None
+    account_id: Optional[str] = None
+    date: Optional[str] = None
     description: Optional[str] = None
+    amount: Optional[float] = None
+    type: Optional[str] = None
+    category_id: Optional[str] = None
+    ledger_name: Optional[str] = None
+    group_name: Optional[str] = None
+    reference_number: Optional[str] = None
+    cheque_number: Optional[str] = None
+    notes: Optional[str] = None
+    metadata: Optional[dict] = None
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -222,11 +275,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 # Keywords for identifying transaction headers in bank statements
 header_keywords = {
     "Date": ["date", "transaction date", "value date", "posting date"],
-    "Description": ["description", "particulars", "transaction description"],
-    "Amount": ["amount", "debit", "credit", "withdrawal", "deposit", "txn amount"],
-    "Debit": ["debit", "withdrawal", "dr"],
-    "Credit": ["credit", "deposit", "cr"],
-    "Balance": ["balance", "closing balance"],
+    "Particulars": ["particulars", "description", "narration", "remarks", "details", "transaction description"],
+    "Amount": ["amount", "transaction amount", "txn amount", "total amount"],
+    "Debit": ["debit", "withdrawal", "dr", "debit amount", "withdrawal amt", "dr amount"],
+    "Credit": ["credit", "deposit", "cr", "credit amount", "deposit amt", "cr amount"],
+    "Balance": ["balance", "closing balance", "running balance", "available balance"],
+    "Group": ["group", "category", "transaction category", "category name"],
+    "Ledger Name": ["ledger name", "ledger", "account", "account name"],
+    "Account Holder Name": ["account holder name", "account holder", "customer name", "beneficiary name", "name"],
     "Cheque Number": ["cheque number", "cheque no", "chq no", "cheque #", "chq number"],
     "Reference": ["reference", "ref no", "reference no", "reference number", "chq/ref no"],
     "Branch": ["branch", "branch name"]
@@ -383,18 +439,36 @@ async def update_password(password_data: PasswordUpdate, current_user: User = De
 
 @api_router.post("/accounts", response_model=BankAccount)
 async def create_account(account_data: BankAccountCreate, current_user: User = Depends(get_current_user)):
+    # Verify client belongs to user
+    client = await db.clients.find_one({"id": account_data.client_id, "user_id": current_user.id})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
     account = BankAccount(
         user_id=current_user.id,
-        account_name=account_data.account_name,
-        bank_name=account_data.bank_name,
-        category=account_data.category,
-        balance=account_data.opening_balance
+        balance=account_data.opening_balance,
+        **account_data.model_dump()
     )
     
     account_dict = account.model_dump()
     account_dict['created_at'] = account_dict['created_at'].isoformat()
     
     await db.accounts.insert_one(account_dict)
+
+    # Create special "opening" transaction
+    opening_txn = Transaction(
+        user_id=current_user.id,
+        account_id=account.id,
+        date=normalize_date(account_data.opening_balance_date),
+        description="Opening Balance",
+        amount=account_data.opening_balance,
+        type="opening",
+        notes="System generated opening balance"
+    )
+    opening_txn_dict = opening_txn.model_dump()
+    opening_txn_dict['created_at'] = opening_txn_dict['created_at'].isoformat()
+    await db.transactions.insert_one(opening_txn_dict)
+
     return account
 
 @api_router.get("/accounts", response_model=List[BankAccount])
@@ -409,6 +483,8 @@ async def get_accounts(current_user: User = Depends(get_current_user)):
 
 @api_router.delete("/accounts/{account_id}")
 async def delete_account(account_id: str, current_user: User = Depends(get_current_user)):
+    # Delete all transactions first
+    await db.transactions.delete_many({"account_id": account_id, "user_id": current_user.id})
     result = await db.accounts.delete_one({"id": account_id, "user_id": current_user.id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -416,19 +492,71 @@ async def delete_account(account_id: str, current_user: User = Depends(get_curre
 
 @api_router.put("/accounts/{account_id}")
 async def update_account(account_id: str, account_data: BankAccountUpdate, current_user: User = Depends(get_current_user)):
+    existing_account = await db.accounts.find_one({"id": account_id, "user_id": current_user.id})
+    if not existing_account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
     update_dict = account_data.model_dump(exclude_unset=True)
     if not update_dict:
         return {"message": "No changes to update"}
     
+    # Handle opening balance update
+    if "opening_balance" in update_dict or "opening_balance_date" in update_dict:
+        new_ob = update_dict.get("opening_balance", existing_account["opening_balance"])
+        new_ob_date = normalize_date(update_dict.get("opening_balance_date", existing_account["opening_balance_date"]))
+        
+        # Calculate balance adjustment
+        ob_diff = new_ob - existing_account["opening_balance"]
+        if ob_diff != 0:
+            update_dict["balance"] = existing_account["balance"] + ob_diff
+            
+        # Update/Create opening transaction
+        await db.transactions.update_one(
+            {"account_id": account_id, "type": "opening"},
+            {"$set": {
+                "amount": new_ob,
+                "date": new_ob_date
+            }},
+            upsert=True # In case it was missing
+        )
+
     result = await db.accounts.update_one(
         {"id": account_id, "user_id": current_user.id},
         {"$set": update_dict}
     )
     
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Account not found")
-        
     return {"message": "Account updated successfully"}
+
+# ==================== CLIENT ROUTES ====================
+
+@api_router.post("/clients", response_model=Client)
+async def create_client(client_data: ClientCreate, current_user: User = Depends(get_current_user)):
+    client = Client(
+        user_id=current_user.id,
+        **client_data.model_dump()
+    )
+    client_dict = client.model_dump()
+    client_dict['created_at'] = client_dict['created_at'].isoformat()
+    await db.clients.insert_one(client_dict)
+    return client
+
+@api_router.get("/clients", response_model=List[Client])
+async def get_clients(current_user: User = Depends(get_current_user)):
+    clients = await db.clients.find({"user_id": current_user.id}).to_list(1000)
+    for c in clients:
+        c.pop("_id", None)
+        if isinstance(c.get('created_at'), str):
+            c['created_at'] = datetime.fromisoformat(c['created_at'])
+    return clients
+
+@api_router.delete("/clients/{client_id}")
+async def delete_client(client_id: str, current_user: User = Depends(get_current_user)):
+    # Also delete child accounts and transactions? 
+    # For now, just delete the client
+    result = await db.clients.delete_one({"id": client_id, "user_id": current_user.id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return {"message": "Client deleted successfully"}
 
 # ==================== CATEGORY ROUTES ====================
 
@@ -461,8 +589,8 @@ async def get_categories(current_user: User = Depends(get_current_user)):
 async def delete_category(category_id: str, current_user: User = Depends(get_current_user)):
     result = await db.categories.delete_one({"id": category_id, "user_id": current_user.id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Category not found")
-    return {"message": "Category deleted successfully"}
+        raise HTTPException(status_code=404, detail="Group not found")
+    return {"message": "Group deleted successfully"}
 
 # ==================== TRANSACTION ROUTES ====================
 
@@ -475,13 +603,7 @@ async def create_transaction(transaction_data: TransactionCreate, current_user: 
     
     transaction = Transaction(
         user_id=current_user.id,
-        account_id=transaction_data.account_id,
-        date=transaction_data.date,
-        description=transaction_data.description,
-        amount=transaction_data.amount,
-        type=transaction_data.type,
-        category_id=transaction_data.category_id,
-        metadata=transaction_data.metadata
+        **transaction_data.model_dump()
     )
     
     if transaction.date:
@@ -511,6 +633,9 @@ async def get_transactions(
     account_id: Optional[str] = None,
     category_id: Optional[str] = None,
     type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    reference: Optional[str] = None,
     current_user: User = Depends(get_current_user)
 ):
     query = {"user_id": current_user.id}
@@ -522,20 +647,40 @@ async def get_transactions(
     if type:
         query["type"] = type
     
-    transactions = await db.transactions.find(query, {"_id": 0}).to_list(1000)
+    # Base fetch
+    transactions = await db.transactions.find(query, {"_id": 0}).to_list(10000)
     
-    # Sort in memory since we are using DD-MM-YYYY string format
-    try:
-        transactions.sort(key=lambda x: datetime.strptime(x['date'], '%d-%m-%Y'), reverse=True)
-    except:
-        # Fallback to default sort if some dates are malformed
-        pass
+    # In-memory sorting and filtering because of DD-MM-YYYY string format
+    def get_date_obj(date_str):
+        try:
+            return datetime.strptime(date_str, '%d-%m-%Y')
+        except:
+            return datetime.min
+
+    # Sort ASC first: Date then Type ('opening' vs others)
+    # Since 'opening' > 'credit'/'debit', and opening应该是最早的, we sort by date asc.
+    # We want 'opening' to be the absolute first transaction of that account.
+    transactions.sort(key=lambda x: (get_date_obj(x['date']), 0 if x['type'] == 'opening' else 1))
+
+    # Apply date filters in memory if provided
+    if date_from:
+        df_obj = get_date_obj(normalize_date(date_from))
+        transactions = [t for t in transactions if get_date_obj(t['date']) >= df_obj]
+    if date_to:
+        dt_obj = get_date_obj(normalize_date(date_to))
+        transactions = [t for t in transactions if get_date_obj(t['date']) <= dt_obj]
+    if reference:
+        ref_lower = reference.lower()
+        transactions = [t for t in transactions if 
+                        (t.get('reference_number') and ref_lower in t['reference_number'].lower()) or 
+                        (t.get('cheque_number') and ref_lower in t['cheque_number'].lower())]
 
     for txn in transactions:
         if isinstance(txn.get('created_at'), str):
             txn['created_at'] = datetime.fromisoformat(txn['created_at'])
     
-    return transactions
+    # Return reversed for 'most recent first' BUT opening will be at the bottom
+    return transactions[::-1]
 
 @api_router.put("/transactions/{transaction_id}", response_model=Transaction)
 async def update_transaction(
@@ -543,17 +688,40 @@ async def update_transaction(
     update_data: TransactionUpdate,
     current_user: User = Depends(get_current_user)
 ):
+    # Get existing transaction
+    existing_txn = await db.transactions.find_one({"id": transaction_id, "user_id": current_user.id})
+    if not existing_txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+        
     update_dict = update_data.model_dump(exclude_unset=True)
     if not update_dict:
         raise HTTPException(status_code=400, detail="No update data provided")
     
-    result = await db.transactions.update_one(
+    # Handle balance change if amount or type or account_id changes
+    if "amount" in update_dict or "type" in update_dict or "account_id" in update_dict:
+        old_amount = existing_txn["amount"]
+        old_type = existing_txn["type"]
+        old_account_id = existing_txn["account_id"]
+        
+        new_amount = update_dict.get("amount", old_amount)
+        new_type = update_dict.get("type", old_type)
+        new_account_id = update_dict.get("account_id", old_account_id)
+        
+        # 1. Reverse old impact from old account
+        old_inc = -old_amount if old_type == "credit" else old_amount
+        await db.accounts.update_one({"id": old_account_id}, {"$inc": {"balance": old_inc}})
+        
+        # 2. Apply new impact to new account
+        new_inc = new_amount if new_type == "credit" else -new_amount
+        await db.accounts.update_one({"id": new_account_id}, {"$inc": {"balance": new_inc}})
+
+    if "date" in update_dict:
+        update_dict["date"] = normalize_date(update_dict["date"])
+
+    await db.transactions.update_one(
         {"id": transaction_id, "user_id": current_user.id},
         {"$set": update_dict}
     )
-    
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Transaction not found")
     
     transaction = await db.transactions.find_one({"id": transaction_id}, {"_id": 0})
     if isinstance(transaction.get('created_at'), str):
@@ -568,13 +736,16 @@ async def delete_transaction(transaction_id: str, current_user: User = Depends(g
     if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found")
     
+    if transaction.get("type") == "opening":
+        raise HTTPException(status_code=400, detail="Opening balance transaction cannot be deleted directly. Update it in Account settings.")
+
     # Reverse balance update
     if transaction["type"] == "credit":
         await db.accounts.update_one(
             {"id": transaction["account_id"]},
             {"$inc": {"balance": -transaction["amount"]}}
         )
-    else:
+    elif transaction["type"] == "debit":
         await db.accounts.update_one(
             {"id": transaction["account_id"]},
             {"$inc": {"balance": transaction["amount"]}}
@@ -689,7 +860,8 @@ async def import_csv(
                 
                 if not transactions_data:
                     # Log some sample lines for debugging
-                    sample_lines = [l for l in lines if l.strip()][:10]
+                    valid_lines: List[str] = [l for l in lines if l.strip()]
+                    sample_lines = [valid_lines[i] for i in range(min(10, len(valid_lines)))]
                     logging.error(f"No transactions found. Sample lines: {sample_lines}")
                     raise HTTPException(status_code=400, detail="No transactions found in PDF. Please ensure it's a text-based PDF with transaction table. Try uploading a CSV file instead.")
                 
@@ -721,20 +893,44 @@ async def import_csv(
         debit_col = None
         credit_col = None
         balance_col = None
+        group_col = None
+        ledger_col = None
+        account_holder_col = None
+        ref_col = None
+        cheque_col = None
+        notes_col = None
         
         for col in df.columns:
             col_lower = col.lower().strip()
-            if 'date' in col_lower or 'txn date' in col_lower or 'transaction date' in col_lower:
+            
+            # Use header_keywords for robust matching
+            if any(k in col_lower for k in header_keywords["Date"]):
                 date_col = col
-            elif 'description' in col_lower or 'narration' in col_lower or 'particulars' in col_lower:
+            elif any(k in col_lower for k in header_keywords["Particulars"]):
                 desc_col = col
-            elif 'cr' in col_lower or 'credit' in col_lower or 'deposit' in col_lower:
+            elif any(k in col_lower for k in header_keywords["Debit"]):
+                debit_col = col
+            elif any(k in col_lower for k in header_keywords["Credit"]):
                 credit_col = col
-            elif 'balance' in col_lower or 'closing' in col_lower:
+            elif any(k in col_lower for k in header_keywords["Balance"]):
                 balance_col = col
+            elif any(k in col_lower for k in header_keywords["Group"]):
+                group_col = col
+            elif any(k in col_lower for k in header_keywords["Ledger Name"]):
+                ledger_col = col
+            elif any(k in col_lower for k in header_keywords["Account Holder Name"]):
+                account_holder_col = col
+            elif any(k in col_lower for k in header_keywords["Reference"]):
+                ref_col = col
+            elif any(k in col_lower for k in header_keywords["Cheque Number"]):
+                cheque_col = col
+            elif any(k in col_lower for k in header_keywords["Notes"]):
+                notes_col = col
         
-        if not all([date_col, desc_col]):
-            raise HTTPException(status_code=400, detail=f"CSV must have Date and Description columns. Found columns: {list(df.columns)}")
+        if not date_col:
+            raise HTTPException(status_code=400, detail=f"CSV must have a Date column. Found columns: {list(df.columns)}")
+        if not desc_col:
+            raise HTTPException(status_code=400, detail=f"CSV must have a Particulars column. Found columns: {list(df.columns)}")
 
         
         imported_count = 0
@@ -793,32 +989,72 @@ async def import_csv(
                     logging.debug(f"Skipping row - both debit and credit are 0: {description}")
                     continue
                 
-                # Auto-categorize based on keywords
+                # Auto-categorize based on Group column if available, else keywords
                 category_id = None
-                desc_lower = description.lower()
                 
-                for cat in categories:
-                    if cat['type'] == 'expense' and any(keyword in desc_lower for keyword in ['rent', 'utilities', 'electricity', 'water']):
-                        if 'rent' in cat['name'].lower():
+                if group_col and pd.notna(row.get(group_col)):
+                    group_val = str(row[group_col]).lower().strip()
+                    for cat in categories:
+                        if cat['name'].lower() == group_val:
                             category_id = cat['id']
                             break
-                    elif cat['type'] == 'income' and any(keyword in desc_lower for keyword in ['salary', 'payment received', 'sales']):
-                        if 'salary' in cat['name'].lower() or 'sales' in cat['name'].lower():
-                            category_id = cat['id']
-                            break
+                            
+                if not category_id:
+                    desc_lower = description.lower()
+                    for cat in categories:
+                        if cat['type'] == 'expense' and any(keyword in desc_lower for keyword in ['rent', 'utilities', 'electricity', 'water']):
+                            if 'rent' in cat['name'].lower():
+                                category_id = cat['id']
+                                break
+                        elif cat['type'] == 'income' and any(keyword in desc_lower for keyword in ['salary', 'payment received', 'sales']):
+                            if 'salary' in cat['name'].lower() or 'sales' in cat['name'].lower():
+                                category_id = cat['id']
+                                break
                 
                 transaction_type = "credit" if credit > 0 else "debit"
-                amount = credit if credit > 0 else debit
+                amount = float(credit) if credit > 0 else float(debit)
                 
-                transaction = Transaction(
-                    user_id=current_user.id,
-                    account_id=account_id,
-                    date=normalize_date(date_str),
-                    description=description,
-                    amount=amount,
-                    type=transaction_type,
-                    category_id=category_id
-                )
+                ledger_name = None
+                if ledger_col and pd.notna(row.get(ledger_col)):
+                    ledger_name = str(row[ledger_col]).strip()
+                
+                group_name = None
+                if group_col and pd.notna(row.get(group_col)):
+                    group_name = str(row[group_col]).strip()
+                
+                ref_no = None
+                if ref_col and pd.notna(row.get(ref_col)):
+                    ref_no = str(row[ref_col]).strip()
+                
+                cheque_no = None
+                if cheque_col and pd.notna(row.get(cheque_col)):
+                    cheque_no = str(row[cheque_col]).strip()
+
+                txn_notes = None
+                if notes_col and pd.notna(row.get(notes_col)):
+                    txn_notes = str(row[notes_col]).strip()
+
+                metadata = {}
+                if account_holder_col and pd.notna(row.get(account_holder_col)):
+                    metadata["account_holder"] = str(row[account_holder_col]).strip()
+                if ledger_name: metadata["ledger_name_legacy"] = ledger_name # keep it for compatibility
+
+                txn_kwargs = {
+                    "user_id": current_user.id,
+                    "account_id": account_id,
+                    "date": normalize_date(date_str),
+                    "description": description,
+                    "amount": amount,
+                    "type": transaction_type,
+                    "category_id": category_id,
+                    "ledger_name": ledger_name,
+                    "group_name": group_name,
+                    "reference_number": ref_no,
+                    "cheque_number": cheque_no,
+                    "notes": txn_notes,
+                    "metadata": metadata if metadata else None
+                }
+                transaction = Transaction(**txn_kwargs)
                 
                 if transaction.date:
                     transaction.date = normalize_date(transaction.date)
@@ -858,7 +1094,11 @@ async def import_csv(
 
 @api_router.get("/reports/summary")
 async def get_summary_report(current_user: User = Depends(get_current_user)):
-    transactions = await db.transactions.find({"user_id": current_user.id}, {"_id": 0}).to_list(10000)
+    # Exclude opening balance transactions from reports
+    transactions = await db.transactions.find(
+        {"user_id": current_user.id, "type": {"$ne": "opening"}}, 
+        {"_id": 0}
+    ).to_list(10000)
     
     total_income = sum(t['amount'] for t in transactions if t['type'] == 'credit')
     total_expense = sum(t['amount'] for t in transactions if t['type'] == 'debit')

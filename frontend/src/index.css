@@ -82,3 +82,11 @@ code {
         border-bottom-color: inherit;
     }
 }
+
+@layer utilities {
+    .hide-calendar-icon::-webkit-calendar-picker-indicator {
+        display: none !important;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+}

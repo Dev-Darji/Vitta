@@ -13,13 +13,30 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
+  // LOG REQUEST
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`🚀 [API Request] ${config.method.toUpperCase()} ${config.url}`, config.data || '');
+  }
+  
   return config;
 });
 
-// Handle 401 errors
+// Handle responses and errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // LOG SUCCESS
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`✅ [API Response] ${response.status} ${response.config.url}`, response.data);
+    }
+    return response;
+  },
   (error) => {
+    // LOG ERROR
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`❌ [API Error] ${error.response?.status || 'Network Error'} ${error.config?.url}`, error.response?.data || error.message);
+    }
+
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');

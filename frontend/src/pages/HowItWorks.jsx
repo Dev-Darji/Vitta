@@ -132,15 +132,15 @@ const HowItWorks = () => {
                 Step 02
               </div>
               <h2 className="font-heading font-bold text-4xl lg:text-5xl text-primary leading-tight">
-                AI-Powered <br/>Categorization
+                AI-Powered <br/>Grouping
               </h2>
               <p className="text-lg text-slate-600">
-                Our smart engine automatically categorizes your transactions using GST-ready classifications. Review, adjust, and confirm in bulk.
+                Our smart engine automatically groups your transactions using GST-ready classifications. Review, adjust, and confirm in bulk.
               </p>
               <ul className="space-y-4">
                 {[
                   'Intelligent pattern matching',
-                  'GST-compliant category structure',
+                  'GST-compliant group structure',
                   'Bulk editing tools for speed'
                 ].map((item, i) => (
                   <li key={i} className="flex items-center gap-3">

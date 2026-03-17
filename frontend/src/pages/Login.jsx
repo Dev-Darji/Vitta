@@ -58,7 +58,7 @@ const Login = () => {
 
               <form data-testid="login-form" onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-xs font-black uppercase tracking-widest text-slate-400">Email Address</Label>
+                  <Label htmlFor="email" className="text-sm font-semibold text-slate-700 mb-2 block">Email Address</Label>
                   <Input
                     data-testid="login-email-input"
                     id="email"
@@ -74,7 +74,7 @@ const Login = () => {
 
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label htmlFor="password" className="text-xs font-black uppercase tracking-widest text-slate-400">Password</Label>
+                    <Label htmlFor="password" className="text-sm font-semibold text-slate-700 mb-2 block">Password</Label>
                     <Link to="/forgot-password" size="sm" className="text-[10px] font-black uppercase tracking-widest text-primary/50 hover:text-primary transition-colors">
                       Forgot?
                     </Link>

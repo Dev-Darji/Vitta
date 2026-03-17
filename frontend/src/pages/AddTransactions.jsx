@@ -14,19 +14,20 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import * as XLSX from 'xlsx';
-import { useBlocker, useNavigate } from 'react-router-dom';
+import { useBlocker, useNavigate, useLocation } from 'react-router-dom';
 import ConfirmPopup from '@/components/ConfirmPopup';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const headerMap = {
   Date: ["date", "transaction date", "txn date", "tran date", "posting date", "date of transaction"],
   ValueDate: ["value date", "val date", "value_date"],
-  Description: ["description", "narration", "remarks", "particulars", "details", "transaction details", "transaction remarks", "memo"],
+  Particulars: ["particulars", "description", "narration", "remarks", "details", "transaction details", "transaction remarks", "memo"],
   Debit: ["debit", "withdrawal", "debit amount", "dr", "withdrawal amt", "amount out", "dr amount", "dr_amount"],
   Credit: ["credit", "deposit", "credit amount", "cr", "deposit amt", "amount in", "cr amount", "cr_amount"],
   Amount: ["amount", "transaction amount", "txn amount", "total amount"],
   Balance: ["balance", "closing balance", "running balance", "available balance", "total balance"],
-  'Account Holder': ["account holder", "account holder name", "account name", "customer name", "name", "beneficiary name", "account_holder", "holder name"],
+  'Ledger Name': ["ledger name", "ledger", "account", "account name"],
+  'Account Holder Name': ["account holder name", "account holder", "customer name", "beneficiary name", "name"],
   'Bank Name': ["bank", "bank name", "banking institution", "bank_name", "bank_name_"],
   'Account Number': ["account number", "a/c number", "account no", "account no.", "acct number", "account_number"],
   'Transaction ID': ["transaction id", "txn id", "reference id", "ref id", "utr", "utr number", "rrn", "trans id", "transaction_id"],
@@ -34,7 +35,7 @@ const headerMap = {
   'Cheque Number': ["cheque number", "cheque no", "chq no", "cheque #", "chq number", "cheque_no"],
   Reference: ["reference", "ref no", "reference no", "reference number", "chq/ref no", "reference_no"],
   Branch: ["branch", "branch name", "branch_name"],
-  Category: ["category", "transaction category", "category_name"],
+  Group: ["group", "category", "transaction category", "category_name"],
   Notes: ["notes", "comments", "remarks notes"]
 };
 
@@ -206,10 +207,10 @@ const autoMapHeaders = (fileHeaders) => {
 };
 
 const downloadTemplate = () => {
-  const headers = 'Date,Description,Debit,Credit,Balance';
-  const sample1 = '2026-01-15,Office Rent Payment,25000,,475000';
-  const sample2 = '2026-01-16,Client Invoice Payment,,150000,625000';
-  const sample3 = '2026-01-17,Electricity Bill,3500,,621500';
+  const headers = 'Date,Particulars,Debit,Credit,Group,Ledger Name';
+  const sample1 = '2026-01-15,Office Rent Payment,25000,,Office Rent,HDFC Rent Account';
+  const sample2 = '2026-01-16,Client Invoice Payment,,150000,Sales,SBI Current Account';
+  const sample3 = '2026-01-17,Electricity Bill,3500,,Utilities,HDFC Expense Account';
   const csv = [headers, sample1, sample2, sample3].join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = window.URL.createObjectURL(blob);
@@ -421,7 +422,7 @@ const ColumnMappingModal = ({ open, onClose, fileHeaders, mapping, setMapping, c
             <Input
               value={newFieldName}
               onChange={e => setNewFieldName(e.target.value)}
-              placeholder="e.g. Category, Tags, Notes..."
+              placeholder="e.g. Group, Tags, Notes..."
               className="flex-1 text-sm"
               onKeyDown={e => e.key === 'Enter' && addCustomField()}
             />
@@ -447,11 +448,20 @@ const ColumnMappingModal = ({ open, onClose, fileHeaders, mapping, setMapping, c
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const AddTransactions = () => {
-  const [activeTab, setActiveTab] = useState('manual');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'manual');
   const [accounts, setAccounts] = useState([]);
+  const [clients, setClients] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState('');
   const [categories, setCategories] = useState([]);
-  const navigate = useNavigate();
+  const dateInputRef = useRef(null);
+
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state]);
 
   // Manual Entry State
   const [manualForm, setManualForm] = useState({
@@ -460,6 +470,11 @@ const AddTransactions = () => {
     type: 'debit',
     amount: '',
     category_id: '',
+    ledger_name: '',
+    group_name: '',
+    reference_number: '',
+    cheque_number: '',
+    notes: '',
     balance: '',
   });
   const [manualCustomFields, setManualCustomFields] = useState([]); // Array of { key: '', value: '' }
@@ -643,12 +658,14 @@ const AddTransactions = () => {
 
   const fetchData = async () => {
     try {
-      const [accRes, catRes] = await Promise.all([
+      const [accRes, catRes, clRes] = await Promise.all([
         api.get('/accounts'),
         api.get('/categories'),
+        api.get('/clients'),
       ]);
       setAccounts(accRes.data);
       setCategories(catRes.data);
+      setClients(clRes.data);
       if (accRes.data.length > 0) setSelectedAccount(accRes.data[0].id);
     } catch {
       toast.error('Failed to load data');
@@ -659,7 +676,7 @@ const AddTransactions = () => {
   const validateManual = () => {
     const errs = {};
     if (!manualForm.date) errs.date = 'Date is required';
-    if (!manualForm.description.trim()) errs.description = 'Description is required';
+    if (!manualForm.description.trim()) errs.description = 'Particulars are required';
     if (!manualForm.amount) errs.amount = 'Amount is required';
     if (manualForm.amount && isNaN(Number(manualForm.amount))) errs.amount = 'Invalid number';
     if (Number(manualForm.amount) <= 0) errs.amount = 'Amount must be greater than 0';
@@ -681,6 +698,11 @@ const AddTransactions = () => {
         amount: Number(manualForm.amount),
         type: manualForm.type,
         category_id: manualForm.category_id || null,
+        ledger_name: manualForm.ledger_name || null,
+        group_name: manualForm.group_name || null,
+        reference_number: manualForm.reference_number || null,
+        cheque_number: manualForm.cheque_number || null,
+        notes: manualForm.notes || null,
         metadata: manualCustomFields.reduce((acc, curr) => {
           if (curr.key && curr.value) acc[curr.key] = curr.value;
           return acc;
@@ -704,7 +726,9 @@ const AddTransactions = () => {
       setRecentTransactions(prev => [res.data, ...prev].slice(0, 5));
       setManualForm({
         date: new Date().toISOString().split('T')[0],
-        description: '', type: 'debit', amount: '', category_id: '', balance: '',
+        description: '', type: 'debit', amount: '', category_id: '',
+        ledger_name: '', group_name: '', reference_number: '', cheque_number: '',
+        notes: '', balance: '',
       });
       setManualCustomFields([]);
       setManualErrors({});
@@ -719,7 +743,9 @@ const AddTransactions = () => {
   const clearManualForm = () => {
     setManualForm({
       date: new Date().toISOString().split('T')[0],
-      description: '', type: 'debit', amount: '', category_id: '', balance: '',
+      description: '', type: 'debit', amount: '', category_id: '',
+      ledger_name: '', group_name: '', reference_number: '', cheque_number: '',
+      notes: '', balance: '',
     });
     setManualCustomFields([]);
     setManualErrors({});
@@ -731,12 +757,6 @@ const AddTransactions = () => {
     if (!['csv', 'xls', 'xlsx'].includes(ext)) { toast.error('Please upload a CSV or Excel file'); return; }
     setTemplateFile(file);
     setTemplateFileMeta({ name: file.name, size: file.size });
-    if (ext !== 'csv') {
-      // For Excel files, we can't easily parse on frontend without a library,
-      // so we'll just skip the preview and let them import directly.
-      setTemplateStep('preview-excel');
-      return;
-    }
     setTemplateParsing(true);
     try {
       let parsed;
@@ -747,7 +767,7 @@ const AddTransactions = () => {
         parsed = await parseExcel(file);
       }
       
-      if (parsed.rows.length === 0) { 
+      if (!parsed || !parsed.rows || parsed.rows.length === 0) { 
         toast.error('No data rows found in the file'); 
         setTemplateParsing(false); 
         return; 
@@ -808,10 +828,6 @@ const AddTransactions = () => {
     if (!['csv', 'xls', 'xlsx'].includes(ext)) { toast.error('Please upload a CSV or Excel file'); return; }
     setCsvFile(file);
     setCsvFileMeta({ name: file.name, size: file.size });
-    if (ext !== 'csv') {
-      setCsvStep('preview-excel');
-      return;
-    }
     setCsvParsing(true);
     try {
       let parsed;
@@ -822,7 +838,7 @@ const AddTransactions = () => {
         parsed = await parseExcel(file);
       }
       
-      if (!parsed.rows || parsed.rows.length === 0) { 
+      if (!parsed || !parsed.rows || parsed.rows.length === 0) { 
         toast.error('No valid data rows found in this file'); 
         setCsvParsing(false); 
         return; 
@@ -836,7 +852,7 @@ const AddTransactions = () => {
       setCsvStep('preview');
       
       const mapped = Object.values(autoMap);
-      const mandatoryFields = ['Date', 'Description'];
+      const mandatoryFields = ['Date', 'Particulars'];
       const hasMandatory = mandatoryFields.every(field => mapped.includes(field));
 
       if (hasMandatory) {
@@ -980,18 +996,21 @@ const AddTransactions = () => {
   // ──── Shared account selector JSX ────
   const renderAccountSelector = () => (
     <div className="mb-6">
-      <Label className="text-sm font-medium text-slate-700 mb-2 block">Select Bank Account</Label>
+      <Label className="text-sm font-semibold text-slate-700 mb-2 block">Select Bank Account</Label>
       {accounts.length > 0 ? (
         <Select value={selectedAccount} onValueChange={setSelectedAccount}>
           <SelectTrigger className="max-w-md" data-testid="account-select">
             <SelectValue placeholder="Select account" />
           </SelectTrigger>
           <SelectContent>
-            {accounts.map(acc => (
-              <SelectItem key={acc.id} value={acc.id}>
-                {acc.account_name} — {acc.bank_name}
-              </SelectItem>
-            ))}
+            {accounts.map(acc => {
+              const client = clients.find(c => c.id === acc.client_id);
+              return (
+                <SelectItem key={acc.id} value={acc.id}>
+                  {client ? <span className="font-bold text-primary mr-1">{client.name} —</span> : ''} {acc.account_name} <span className="text-slate-400 text-[10px] ml-1">({acc.bank_name})</span>
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
       ) : (
@@ -1051,7 +1070,7 @@ const AddTransactions = () => {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="bg-white rounded-3xl border border-slate-200 p-6 lg:p-10"
+              className="bg-white rounded-2xl border border-slate-200 p-6 lg:p-10"
             >
               {/* Manual Entry */}
               <TabsContent value="manual" className="mt-0 focus-visible:ring-0 outline-none">
@@ -1064,34 +1083,39 @@ const AddTransactions = () => {
 
                   <form onSubmit={handleManualSubmit} className="bg-slate-50/50 p-6 sm:p-8 rounded-2xl border border-slate-100 space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      {/* Date */}
                       <div>
-                        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Date</Label>
+                        <Label className="text-sm font-semibold text-slate-700 mb-2 block">Date</Label>
                         <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <button
+                            type="button"
+                            onClick={() => dateInputRef.current?.showPicker?.()}
+                            className="absolute inset-y-0 left-0 pl-3 flex items-center z-10 hover:text-primary transition-colors"
+                          >
                             <CalendarDays className="h-4 w-4 text-slate-400" />
-                          </div>
+                          </button>
                           <Input
                             type="date"
+                            ref={dateInputRef}
                             value={manualForm.date}
                             onChange={e => setManualForm(p => ({ ...p, date: e.target.value }))}
-                            className={`pl-10 bg-white ${manualErrors.date ? 'border-red-400 focus:ring-red-400' : ''}`}
+                            onClick={() => dateInputRef.current?.showPicker?.()}
+                            className={`pl-10 bg-white hide-calendar-icon cursor-pointer ${manualErrors.date ? 'border-red-400 focus:ring-red-400' : ''}`}
                           />
                         </div>
                         {manualErrors.date && <p className="text-xs text-red-500 mt-1">{manualErrors.date}</p>}
                       </div>
 
-                      {/* Category */}
+                      {/* Group */}
                       <div>
-                        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">
-                          Category <span className="text-slate-400 font-normal">(optional)</span>
+                        <Label className="text-sm font-semibold text-slate-700 mb-2 block">
+                          Group <span className="text-slate-400 font-normal">(optional)</span>
                         </Label>
                         <Select
                           value={manualForm.category_id || 'none'}
                           onValueChange={val => setManualForm(p => ({ ...p, category_id: val === 'none' ? '' : val }))}
                         >
                           <SelectTrigger className="w-full bg-white">
-                            <SelectValue placeholder="Select category" />
+                            <SelectValue placeholder="Select group" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">
@@ -1110,77 +1134,143 @@ const AddTransactions = () => {
                       </div>
                     </div>
 
-                    {/* Description */}
+                    {/* Particulars */}
                     <div>
-                      <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Description</Label>
+                      <Label className="text-sm font-semibold text-slate-700 mb-2 block">Particulars</Label>
                       <Input
                         placeholder="e.g. Office rent payment, Client invoice..."
                         value={manualForm.description}
                         onChange={e => setManualForm(p => ({ ...p, description: e.target.value }))}
-                        className={`bg-white ${manualErrors.description ? 'border-red-400' : ''}`}
+                        className={`bg-white placeholder:text-slate-400 ${manualErrors.description ? 'border-red-400' : ''}`}
                       />
                       {manualErrors.description && <p className="text-xs text-red-500 mt-1">{manualErrors.description}</p>}
                     </div>
 
                     {/* Type & Amount */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <div>
-                        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Transaction Type</Label>
-                        <Select
-                          value={manualForm.type}
-                          onValueChange={val => setManualForm(p => ({ ...p, type: val }))}
-                        >
-                          <SelectTrigger className="w-full bg-white">
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="debit">Money Out (Debit)</SelectItem>
-                            <SelectItem value="credit">Money In (Credit)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    {/* Amount and Type Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end p-6 bg-slate-50/50 rounded-2xl border border-slate-100">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold text-slate-700 mb-2 block">Type</Label>
+                        <div className="flex gap-4 p-1.5 bg-white rounded-xl border-2 border-slate-100 h-16">
+                          <button
+                            type="button"
+                            onClick={() => setManualForm({ ...manualForm, type: 'debit' })}
+                            className={`flex-1 flex items-center justify-center gap-2 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-500
+                              ${manualForm.type === 'debit' 
+                                ? 'bg-red-50 text-red-600 shadow-sm' 
+                                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                          >
+                            <Scale className="h-4 w-4" /> Debit (Out)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setManualForm({ ...manualForm, type: 'credit' })}
+                            className={`flex-1 flex items-center justify-center gap-2 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-500
+                              ${manualForm.type === 'credit' 
+                                ? 'bg-green-50 text-green-600 shadow-sm' 
+                                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                          >
+                            <Plus className="h-4 w-4" /> Credit (In)
+                          </button>
+                        </div>
                       </div>
 
-                      <div>
-                        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">
-                          Amount <span className="text-slate-400 font-normal">(₹)</span>
-                        </Label>
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <IndianRupee className="h-4 w-4 text-slate-400" />
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold text-slate-700 mb-2 block">Transaction Amount</Label>
+                        <div className="relative group">
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center justify-center p-2 bg-white rounded-xl shadow-sm group-focus-within:bg-primary group-focus-within:text-white transition-all duration-300">
+                            <IndianRupee className="h-4 w-4" />
                           </div>
                           <Input
+                            data-testid="amount-input"
                             type="number"
-                            min="0"
-                            step="0.01"
                             placeholder="0.00"
                             value={manualForm.amount}
-                            onChange={e => setManualForm(p => ({ ...p, amount: e.target.value }))}
-                            className={`pl-9 bg-white ${manualErrors.amount ? 'border-red-400' : ''}`}
+                            onChange={(e) => setManualForm({ ...manualForm, amount: e.target.value })}
+                            onWheel={(e) => e.target.blur()} 
+                            required
+                            className="h-16 pl-16 text-xl font-black text-slate-950 rounded-2xl border-2 border-slate-100 focus-visible:ring-primary/10 hover:border-slate-200 transition-all placeholder:text-slate-400"
                           />
                         </div>
-                        {manualErrors.amount && <p className="text-xs text-red-500 mt-1">{manualErrors.amount}</p>}
                       </div>
+                    </div>
 
-                      <div>
-                        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">
-                          Closing Balance <span className="text-slate-400 font-normal">(₹ - Optional)</span>
-                        </Label>
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Scale className="h-4 w-4 text-slate-400" />
-                          </div>
-                          <Input
-                            type="number"
-                            placeholder="Calculating..."
-                            value={manualForm.balance}
-                            readOnly
-                            className="pl-9 bg-slate-50 border-slate-200 text-slate-500 font-semibold cursor-not-allowed"
-                          />
-                        </div>
-                        <p className="text-[10px] text-slate-400 mt-1.5 font-medium italic">
-                          Auto-calculated next balance
-                        </p>
+                    {/* Accounting Details: Ledger & Group */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold text-slate-700 mb-2 block">Ledger Name</Label>
+                        <Input
+                          placeholder="e.g. Salary, Rent, Sales"
+                          value={manualForm.ledger_name}
+                          onChange={(e) => setManualForm({ ...manualForm, ledger_name: e.target.value })}
+                          className="h-14 rounded-2xl border-2 border-slate-100 focus-visible:ring-primary/10 font-bold placeholder:text-slate-400"
+                        />
                       </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold text-slate-700 mb-2 block">Group (Secondary Category)</Label>
+                        <Input
+                          placeholder="e.g. Direct Expenses, Income"
+                          value={manualForm.group_name}
+                          onChange={(e) => setManualForm({ ...manualForm, group_name: e.target.value })}
+                          className="h-14 rounded-2xl border-2 border-slate-100 focus-visible:ring-primary/10 font-bold placeholder:text-slate-400"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Reference Numbers */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold text-slate-700 mb-2 block">Reference Number</Label>
+                        <Input
+                          placeholder="TXN123456789"
+                          value={manualForm.reference_number}
+                          onChange={(e) => setManualForm({ ...manualForm, reference_number: e.target.value })}
+                          className="h-14 rounded-2xl border-2 border-slate-100 focus-visible:ring-primary/10 font-bold text-slate-600 uppercase tracking-tight placeholder:text-slate-400"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold text-slate-700 mb-2 block">Cheque / Chq Number</Label>
+                        <Input
+                          placeholder="000123"
+                          value={manualForm.cheque_number}
+                          onChange={(e) => setManualForm({ ...manualForm, cheque_number: e.target.value })}
+                          className="h-14 rounded-2xl border-2 border-slate-100 focus-visible:ring-primary/10 font-bold text-slate-600 placeholder:text-slate-400"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Notes / Particulars Description */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-slate-700 mb-2 block">Transaction Notes (Internal)</Label>
+                      <textarea
+                        placeholder="Any additional details if description (particulars) is not enough..."
+                        value={manualForm.notes}
+                        onChange={(e) => setManualForm({ ...manualForm, notes: e.target.value })}
+                        className="w-full h-24 p-5 rounded-2xl border-2 border-slate-100 bg-slate-50/20 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none transition-all font-medium text-slate-700 placeholder:text-slate-400"
+                      />
+                    </div>
+
+                    {/* Balance Auto-calculated Section */}
+                    <div>
+                      <Label className="text-sm font-semibold text-slate-700 mb-2 block">
+                        Closing Balance
+                      </Label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <Scale className="h-4 w-4 text-slate-400" />
+                        </div>
+                        <Input
+                          type="number"
+                          placeholder="Calculating..."
+                          value={manualForm.balance}
+                          onWheel={(e) => e.target.blur()}
+                          readOnly
+                          className="pl-9 bg-slate-50 border-slate-200 text-slate-500 font-semibold cursor-not-allowed h-12 rounded-xl placeholder:text-slate-400"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1.5 font-medium">
+                        Auto-calculated next balance
+                      </p>
                     </div>
 
                     {/* Custom / Additional Fields */}
@@ -1196,21 +1286,6 @@ const AddTransactions = () => {
                           </div>
                           <h4 className="text-sm font-semibold text-slate-800 group-hover/add-header:text-primary transition-colors">Additional Details</h4>
                         </button>
-                        
-                        {manualCustomFields.length === 0 && (
-                          <div className="flex gap-2">
-                            {METADATA_SUGGESTIONS.map((s) => (
-                              <button
-                                key={s.key}
-                                type="button"
-                                onClick={() => setManualCustomFields(prev => [...prev, { key: s.key, value: '' }])}
-                                className="text-[11px] font-medium bg-white border border-slate-200 text-slate-600 px-2.5 py-1 rounded-full hover:border-primary hover:text-primary transition-all shadow-sm"
-                              >
-                                + {s.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1221,81 +1296,43 @@ const AddTransactions = () => {
                               initial={{ opacity: 0, scale: 0.9, y: 20 }}
                               animate={{ opacity: 1, scale: 1, y: 0 }}
                               exit={{ opacity: 0, scale: 0.8, y: 10 }}
-                              className="group relative flex flex-col sm:flex-row gap-4 p-5 bg-slate-50/50 hover:bg-white rounded-[28px] border-2 border-slate-100 hover:border-primary/20 shadow-sm hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500"
+                              className="group relative flex flex-col sm:flex-row gap-4 p-5 bg-slate-50/50 hover:bg-white rounded-2xl border-2 border-slate-100 hover:border-primary/20 shadow-sm hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500"
                             >
-                              {/* Field Name */}
                               <div className="flex-1 space-y-1.5 min-w-0">
-                                <div className="flex items-center gap-1.5 px-1">
-                                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Field Name</Label>
-                                  <Tag className="h-2.5 w-2.5 text-slate-300" />
-                                </div>
+                                <Label className="text-sm font-semibold text-slate-700 mb-2 block">Field Name</Label>
                                 <Input
-                                  placeholder="Property..."
                                   value={field.key}
                                   onChange={(e) => {
                                     const newFields = [...manualCustomFields];
                                     newFields[index].key = e.target.value;
                                     setManualCustomFields(newFields);
                                   }}
-                                  className="h-12 bg-white border-2 border-slate-100 rounded-2xl px-4 text-sm font-bold text-slate-700 placeholder:font-medium placeholder:text-slate-300 focus-visible:ring-4 focus-visible:ring-primary/5 focus-visible:border-primary transition-all shadow-sm"
+                                  className="h-10 bg-white border-slate-100 rounded-xl px-3 text-xs font-bold"
                                 />
                               </div>
-
-                              {/* Value */}
                               <div className="flex-1 space-y-1.5 min-w-0">
-                                <div className="flex items-center gap-1.5 px-1">
-                                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Value</Label>
-                                </div>
+                                <Label className="text-sm font-semibold text-slate-700 mb-2 block">Value</Label>
                                 <Input
-                                  placeholder="Detail..."
                                   value={field.value}
                                   onChange={(e) => {
                                     const newFields = [...manualCustomFields];
                                     newFields[index].value = e.target.value;
                                     setManualCustomFields(newFields);
                                   }}
-                                  className="h-12 bg-white border-2 border-slate-100 rounded-2xl px-4 text-sm font-bold text-slate-900 placeholder:font-normal placeholder:text-slate-300 focus-visible:ring-4 focus-visible:ring-primary/5 focus-visible:border-primary transition-all shadow-sm"
+                                  className="h-10 bg-white border-slate-100 rounded-xl px-3 text-xs font-bold"
                                 />
                               </div>
-
-                              {/* Delete Button */}
                               <button
                                 type="button"
                                 onClick={() => setManualCustomFields(prev => prev.filter((_, i) => i !== index))}
-                                className="absolute -top-2 -right-2 h-7 w-7 bg-white text-slate-400 hover:text-red-500 hover:scale-110 rounded-full flex items-center justify-center shadow-md border border-slate-100 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10"
+                                className="absolute -top-2 -right-2 h-6 w-6 bg-white text-slate-300 hover:text-red-500 rounded-full flex items-center justify-center shadow-sm border border-slate-100"
                               >
-                                <X className="h-3.5 w-3.5" />
+                                <X className="h-3 w-3" />
                               </button>
                             </motion.div>
                           ))}
                         </AnimatePresence>
                       </div>
-
-                      {manualCustomFields.length > 0 && (
-                        <div className="flex items-center gap-3">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="text-primary hover:bg-primary/5 text-xs font-semibold rounded-lg"
-                            onClick={() => setManualCustomFields(prev => [...prev, { key: '', value: '' }])}
-                          >
-                            <Plus className="h-3.5 w-3.5 mr-1" /> Add Another Field
-                          </Button>
-                          <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                            {METADATA_SUGGESTIONS.filter(s => !manualCustomFields.some(f => f.key === s.key)).map((s) => (
-                              <button
-                                key={s.key}
-                                type="button"
-                                onClick={() => setManualCustomFields(prev => [...prev, { key: s.key, value: '' }])}
-                                className="whitespace-nowrap text-[10px] font-medium bg-slate-50 text-slate-500 px-2 py-1 rounded-md hover:bg-primary/10 hover:text-primary transition-all border border-slate-100"
-                              >
-                                + {s.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     {/* Actions */}
@@ -1507,7 +1544,7 @@ const AddTransactions = () => {
                           file={csvFile || (csvFileMeta ? { name: csvFileMeta.name, size: csvFileMeta.size, isGhost: true } : null)}
                           loading={csvParsing}
                           label="Upload your bank statement or ledger"
-                          sublabel="Auto-maps headers for Date, Description, and Amount"
+                          sublabel="Auto-maps headers for Date, Particulars, and Amount"
                         />
                         <div className="p-6 bg-blue-50/50 border-2 border-dashed border-blue-100 rounded-[32px] flex items-start gap-4">
                           <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-blue-100">

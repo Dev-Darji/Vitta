@@ -9,6 +9,7 @@ import api from '@/lib/api';
 
 const ImportStatement = () => {
   const [accounts, setAccounts] = useState([]);
+  const [clients, setClients] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState('');
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -20,10 +21,14 @@ const ImportStatement = () => {
 
   const fetchAccounts = async () => {
     try {
-      const response = await api.get('/accounts');
-      setAccounts(response.data);
-      if (response.data.length > 0) {
-        setSelectedAccount(response.data[0].id);
+      const [accRes, clRes] = await Promise.all([
+        api.get('/accounts'),
+        api.get('/clients')
+      ]);
+      setAccounts(accRes.data);
+      setClients(clRes.data);
+      if (accRes.data.length > 0) {
+        setSelectedAccount(accRes.data[0].id);
       }
     } catch (error) {
       toast.error('Failed to load accounts');
@@ -94,18 +99,21 @@ const ImportStatement = () => {
         <div className="space-y-6">
           {/* Account Selection */}
           <div>
-            <Label className="text-sm font-medium text-slate-700 mb-2 block">Select Bank Account</Label>
+            <Label className="text-sm font-semibold text-slate-700 mb-2 block">Select Bank Account</Label>
             {accounts.length > 0 ? (
               <Select value={selectedAccount} onValueChange={setSelectedAccount}>
                 <SelectTrigger data-testid="account-select">
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
-                  {accounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.account_name} - {account.bank_name}
-                    </SelectItem>
-                  ))}
+                  {accounts.map((account) => {
+                    const client = clients.find(c => c.id === account.client_id);
+                    return (
+                      <SelectItem key={account.id} value={account.id}>
+                        {client ? <span className="font-bold text-primary mr-1">{client.name} —</span> : ''} {account.account_name} <span className="text-slate-400 text-[10px] ml-1">({account.bank_name})</span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             ) : (
@@ -121,7 +129,7 @@ const ImportStatement = () => {
 
           {/* File Upload */}
           <div>
-            <Label className="text-sm font-medium text-slate-700 mb-2 block">Upload CSV or PDF File</Label>
+            <Label className="text-sm font-semibold text-slate-700 mb-2 block">Upload CSV or PDF File</Label>
             <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-primary transition-colors">
               <input
                 data-testid="file-input"
@@ -157,8 +165,8 @@ const ImportStatement = () => {
           {/* File Format Info */}
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <h4 className="font-semibold text-sm text-blue-900 mb-2">Supported Formats</h4>
-            <p className="text-sm text-blue-800 mb-2"><strong>CSV:</strong> Should have Date, Description, Debit, and Credit columns</p>
-            <p className="text-sm text-blue-800"><strong>PDF:</strong> Text-based bank statement with transaction table (Date, Description, Amount)</p>
+            <p className="text-sm text-blue-800 mb-2"><strong>CSV:</strong> Should have Date, Particulars, Debit, and Credit columns (Ledger and Account Holder Name supported)</p>
+            <p className="text-sm text-blue-800"><strong>PDF:</strong> Text-based bank statement with transaction table (Date, Particulars, Amount)</p>
           </div>
 
           {/* Upload Button */}

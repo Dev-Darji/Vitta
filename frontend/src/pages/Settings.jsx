@@ -93,12 +93,12 @@ const Settings = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm"
+        className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm"
       >
         <h3 className="font-heading font-semibold text-lg text-primary mb-6">Profile Information</h3>
         <form data-testid="profile-form" onSubmit={handleUpdateProfile} className="space-y-4">
           <div>
-            <Label>Full Name</Label>
+            <Label className="text-sm font-semibold text-slate-700 mb-2 block">Full Name</Label>
             <Input
               data-testid="profile-name-input"
               value={profileData.name}
@@ -107,12 +107,12 @@ const Settings = () => {
             />
           </div>
           <div>
-            <Label>Email</Label>
+            <Label className="text-sm font-semibold text-slate-700 mb-2 block">Email</Label>
             <Input value={user?.email || ''} disabled className="bg-slate-50" />
             <p className="text-xs text-slate-500 mt-1">Email cannot be changed</p>
           </div>
           <div>
-            <Label>Business Name</Label>
+            <Label className="text-sm font-semibold text-slate-700 mb-2 block">Business Name</Label>
             <Input
               data-testid="profile-business-input"
               value={profileData.business_name}
@@ -131,12 +131,12 @@ const Settings = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm"
+        className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm"
       >
         <h3 className="font-heading font-semibold text-lg text-primary mb-6">Change Password</h3>
         <form data-testid="password-form" onSubmit={handleUpdatePassword} className="space-y-4">
           <div>
-            <Label>Current Password</Label>
+            <Label className="text-sm font-semibold text-slate-700 mb-2 block">Current Password</Label>
             <Input
               data-testid="current-password-input"
               type="password"
@@ -146,7 +146,7 @@ const Settings = () => {
             />
           </div>
           <div>
-            <Label>New Password</Label>
+            <Label className="text-sm font-semibold text-slate-700 mb-2 block">New Password</Label>
             <Input
               data-testid="new-password-input"
               type="password"
@@ -156,7 +156,7 @@ const Settings = () => {
             />
           </div>
           <div>
-            <Label>Confirm New Password</Label>
+            <Label className="text-sm font-semibold text-slate-700 mb-2 block">Confirm New Password</Label>
             <Input
               data-testid="confirm-password-input"
               type="password"

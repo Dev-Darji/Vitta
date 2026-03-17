@@ -95,7 +95,7 @@ const Signup = () => {
 
               <form data-testid="signup-form" onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-xs font-black uppercase tracking-widest text-slate-400">Full Name</Label>
+                  <Label htmlFor="name" className="text-sm font-semibold text-slate-700 mb-2 block">Full Name</Label>
                   <Input
                     data-testid="signup-name-input"
                     id="name"
@@ -110,7 +110,7 @@ const Signup = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-xs font-black uppercase tracking-widest text-slate-400">Email Address</Label>
+                  <Label htmlFor="email" className="text-sm font-semibold text-slate-700 mb-2 block">Email Address</Label>
                   <Input
                     data-testid="signup-email-input"
                     id="email"
@@ -126,7 +126,7 @@ const Signup = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="password" className="text-xs font-black uppercase tracking-widest text-slate-400">Password</Label>
+                    <Label htmlFor="password" className="text-sm font-semibold text-slate-700 mb-2 block">Password</Label>
                     <div className="relative">
                       <Input
                         data-testid="signup-password-input"
@@ -150,7 +150,7 @@ const Signup = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword" className="text-xs font-black uppercase tracking-widest text-slate-400">Confirm</Label>
+                    <Label htmlFor="confirmPassword" className="text-sm font-semibold text-slate-700 mb-2 block">Confirm</Label>
                     <div className="relative">
                       <Input
                         data-testid="signup-confirm-password-input"

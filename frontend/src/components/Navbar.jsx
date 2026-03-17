@@ -77,12 +77,12 @@ export const Navbar = () => {
                     shouldShowSolid ? 'bg-primary shadow-primary/10' : 'bg-accent shadow-accent/20'
                   }`}
                 >
-                <span className={`font-black text-lg italic leading-none transform -translate-x-[1px] -translate-y-[0.5px] ${shouldShowSolid ? 'text-accent' : 'text-primary'}`}>V</span>
+                <span className={`font-black text-lg leading-none transform -translate-x-[1px] -translate-y-[0.5px] ${shouldShowSolid ? 'text-accent' : 'text-primary'}`}>V</span>
                 </motion.div>
                 <span className={`font-heading font-black text-xl tracking-tighter transition-colors duration-500 ${
                   shouldShowSolid ? 'text-primary' : 'text-white' 
                 }`}>
-                  Vitta<span className="text-accent italic">.</span>
+                  Vitta<span className="text-accent">.</span>
                 </span>
               </Link>
             </div>
@@ -197,7 +197,7 @@ export const Navbar = () => {
                         onClick={() => setIsOpen(false)}
                         className="group flex items-baseline space-x-4"
                       >
-                        <span className="text-slate-200 font-heading font-black text-2xl group-hover:text-accent transition-colors italic">0{navLinks.indexOf(link) + 1}</span>
+                        <span className="text-slate-200 font-heading font-black text-2xl group-hover:text-accent transition-colors">0{navLinks.indexOf(link) + 1}</span>
                         <span className="text-5xl font-heading font-black text-primary hover:text-accent transition-colors tracking-tighter">
                           {link.name}<span className="text-accent opacity-0 group-hover:opacity-100 transition-opacity">.</span>
                         </span>
