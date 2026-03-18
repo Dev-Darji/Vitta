@@ -38,9 +38,14 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      const isAuthPath = window.location.pathname === '/login' || window.location.pathname === '/signup' || window.location.pathname === '/';
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
+      
+      if (!isAuthPath && !isLoginRequest) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
