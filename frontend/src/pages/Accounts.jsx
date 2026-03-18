@@ -382,8 +382,9 @@ const Accounts = () => {
         {/* ── Create Account Dialog ── */}
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-slate-900 hover:bg-black text-white h-9 px-5 rounded-lg text-[13px] font-semibold shadow-sm flex items-center gap-2">
-              <Plus className="h-4 w-4" />Add Account
+            <Button className="bg-slate-900 hover:bg-black text-white h-9 px-5 rounded-lg flex items-center gap-2 shadow-sm">
+              <Plus className="h-4 w-4" />
+              <span className="text-[13px] font-semibold translate-y-[-0.5px]">Add Account</span>
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[480px] rounded-2xl border border-slate-100 shadow-2xl p-0 overflow-hidden bg-white">

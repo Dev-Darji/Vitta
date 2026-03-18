@@ -83,6 +83,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [summary, setSummary] = useState({ total_income: 0, total_expense: 0, net_balance: 0, transaction_count: 0 });
   const [monthlyTrend, setMonthlyTrend] = useState([]);
+  const [categoryBreakdown, setCategoryBreakdown] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -90,14 +91,16 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [summaryRes, trendRes, accountsRes] = await Promise.all([
+      const [summaryRes, trendRes, accountsRes, breakdownRes] = await Promise.all([
         api.get('/reports/summary'),
         api.get('/reports/monthly-trend'),
         api.get('/accounts'),
+        api.get('/reports/category-breakdown'),
       ]);
       setSummary(summaryRes.data);
       setMonthlyTrend(trendRes.data);
       setAccounts(accountsRes.data);
+      setCategoryBreakdown(breakdownRes.data);
     } catch { toast.error('Failed to load dashboard data'); }
     finally { setLoading(false); }
   };
@@ -120,14 +123,17 @@ const Dashboard = () => {
     { label: 'Transactions',   value: summary.transaction_count ?? 0, icon: Receipt, badge: 'All time', badgeColor: 'bg-amber-50 text-amber-600', iconBg: 'bg-amber-50', iconColor: 'text-amber-600', isCount: true },
   ];
 
-  /* sample pie data for morphology — replace with real category data if available */
-  const morphologyData = [
-    { name: 'Operations',    value: 45000 },
-    { name: 'Infrastructure',value: 32000 },
-    { name: 'Human Capital', value: 28000 },
-    { name: 'Marketing',     value: 15000 },
-    { name: 'Misc',          value: 5000 },
-  ];
+  /* Process category breakdown for Expense Mix */
+  const expenseBreakdown = categoryBreakdown
+    .filter(cat => cat.type === 'expense')
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
+
+  const morphologyData = expenseBreakdown.length > 0 
+    ? expenseBreakdown.map(cat => ({ name: cat.name, value: cat.total, color: cat.color }))
+    : [
+        { name: 'No Expenses', value: 1, color: '#f1f5f9' }
+      ];
 
   return (
     <div data-dashboard className="space-y-6 pb-24">
@@ -271,8 +277,8 @@ const Dashboard = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={morphologyData} cx="50%" cy="50%" innerRadius={42} outerRadius={62} paddingAngle={3} dataKey="value" strokeWidth={0}>
-                        {morphologyData.map((_, i) => (
-                          <Cell key={i} fill={PIE_PALETTE[i % PIE_PALETTE.length]} />
+                        {morphologyData.map((item, i) => (
+                          <Cell key={i} fill={item.color || PIE_PALETTE[i % PIE_PALETTE.length]} />
                         ))}
                       </Pie>
                       <Tooltip content={<ChartTooltip />} />
@@ -283,7 +289,7 @@ const Dashboard = () => {
                   {morphologyData.map((item, i) => (
                     <div key={i} className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_PALETTE[i % PIE_PALETTE.length] }} />
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color || PIE_PALETTE[i % PIE_PALETTE.length] }} />
                         <span className="text-[11.5px] font-medium text-slate-600 truncate">{item.name}</span>
                       </div>
                       <span className="text-[11.5px] font-semibold text-slate-800 flex-shrink-0">₹{item.value.toLocaleString('en-IN')}</span>
@@ -350,7 +356,7 @@ const Dashboard = () => {
 
           {/* Reports CTA */}
           <div
-            className="anim anim-5 bg-emerald-500 text-white p-5 rounded-xl relative overflow-hidden cursor-pointer hover:bg-emerald-600 transition-colors group"
+            className="anim anim-5 bg-[#10b981] text-white p-5 rounded-xl relative overflow-hidden cursor-pointer hover:bg-[#0da271] transition-colors group"
             onClick={() => navigate('/reports')}
           >
             <Receipt className="absolute bottom-4 right-4 h-12 w-12 text-white/15 -rotate-12 group-hover:scale-110 transition-transform duration-300" />
@@ -360,7 +366,7 @@ const Dashboard = () => {
               View income trends, expense breakdowns and export statements.
             </p>
             <Button onClick={(e) => { e.stopPropagation(); navigate('/reports'); }}
-              className="bg-slate-900 text-white hover:bg-black text-[12.5px] font-semibold px-5 h-8 rounded-lg shadow-sm">
+              className="bg-slate-900 text-white hover:bg-black text-[12.5px] font-semibold px-5 h-8 rounded-lg shadow-sm border-none">
               Open Reports
             </Button>
           </div>

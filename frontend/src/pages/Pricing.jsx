@@ -6,278 +6,164 @@ import { Check, ArrowRight, Zap, Star, ShieldCheck, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 
+const FONT_STYLE = `
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Geist:wght@300;400;500;600&display=swap');
+  *, body { font-family: 'Geist', 'Geist Fallback', -apple-system, sans-serif; }
+  .font-sora { font-family: 'Sora', sans-serif; }
+`;
+
 const Pricing = () => {
   const [billingPeriod, setBillingPeriod] = React.useState('monthly');
-
-  const fadeInUp = {
-    initial: { opacity: 0, y: 20 },
-    whileInView: { opacity: 1, y: 0 },
-    viewport: { once: true },
-    transition: { duration: 0.6 }
-  };
+  const fadeIn = { initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] } };
 
   const plans = [
-    {
-      name: 'Starter',
-      icon: Zap,
-      monthlyPrice: '0',
-      yearlyPrice: '0',
-      period: billingPeriod === 'monthly' ? '/forever' : '/forever',
-      description: 'Ideal for sole proprietors starting their digital financial journey.',
-      features: [
-        '5 statements per month',
-        'Basic financial reports',
-        'Email support (24h response)',
-        'Cloud storage for 30 days',
-        'Direct PDF export'
-      ],
-      cta: 'Get Started Free',
-      popular: false,
-    },
-    {
-      name: 'Business',
-      icon: Star,
-      monthlyPrice: '499',
-      yearlyPrice: '4790',
-      period: billingPeriod === 'monthly' ? '/per month' : '/per year',
-      description: 'Our most popular plan for active SMBs and professional accountants.',
-      features: [
-        '25 statements per month',
-        'Advanced financial reports',
-        'Priority email support',
-        'Data stored for 1 year',
-        'PDF & Excel export',
-        'GST-ready classification',
-        'Bulk editing tools'
-      ],
-      cta: 'Start 14-Day Trial',
-      popular: true,
-    },
-    {
-      name: 'Enterprise',
-      icon: ShieldCheck,
-      monthlyPrice: '999',
-      yearlyPrice: '9590',
-      period: billingPeriod === 'monthly' ? '/per month' : '/per year',
-      description: 'The ultimate power-house for high-volume financial data processing.',
-      features: [
-        'Unlimited statements',
-        'Full audit-ready reports',
-        '24/7 dedicated support',
-        'Unlimited data vault',
-        'Custom classification tags',
-        'Multi-user workspace',
-        'API & Webhook access'
-      ],
-      cta: 'Upgrade to Pro',
-      popular: false,
-    },
+    { name: 'Starter', icon: Zap, mp: '0', yp: '0', period: '/forever', desc: 'Ideal for sole proprietors beginning their digital finance journey.', features: ['5 statements per month','Basic financial reports','Email support (24h)','Cloud storage 30 days','PDF export'], cta: 'Get started free', popular: false },
+    { name: 'Business', icon: Star, mp: '499', yp: '4,790', period: billingPeriod === 'monthly' ? '/per month' : '/per year', desc: 'Most popular for active SMBs and professional accountants.', features: ['25 statements per month','Advanced reports','Priority email support','Data stored 1 year','PDF & Excel export','GST-ready classification','Bulk editing tools'], cta: 'Start 14-day trial', popular: true },
+    { name: 'Enterprise', icon: ShieldCheck, mp: '999', yp: '9,590', period: billingPeriod === 'monthly' ? '/per month' : '/per year', desc: 'The powerhouse for high-volume financial data processing.', features: ['Unlimited statements','Full audit-ready reports','24/7 dedicated support','Unlimited data vault','Custom tags','Multi-user workspace','API & Webhook access'], cta: 'Upgrade to Enterprise', popular: false },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#F6F6F3]">
+      <style>{FONT_STYLE}</style>
       <Navbar />
-      
-      {/* Hero Section */}
-      <div className="relative pt-44 pb-32 px-4 overflow-hidden bg-primary text-center">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(200,233,71,0.1)_0%,rgba(0,0,0,0)_70%)]" />
-        <div className="max-w-4xl mx-auto relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <h1 className="font-heading font-extrabold text-5xl lg:text-7xl text-white mb-6 tracking-tight text-balance">
-              Invest in Your <span className="text-accent underline decoration-accent/30 underline-offset-8">Growth</span>
-            </h1>
-            <p className="text-xl text-white/70 max-w-2xl mx-auto leading-relaxed">
-              Transparent, scalable pricing for every stage of your business. 
-              Switch between billing periods to find your perfect fit.
-            </p>
 
-            {/* Billing Toggle */}
-            <div className="mt-12 flex justify-center items-center gap-4">
-              <span className={`text-sm font-bold tracking-widest uppercase transition-colors ${billingPeriod === 'monthly' ? 'text-white' : 'text-white/40'}`}>Monthly</span>
-              <button 
-                onClick={() => setBillingPeriod(billingPeriod === 'monthly' ? 'yearly' : 'monthly')}
-                className="w-16 h-8 bg-white/10 rounded-full p-1 relative transition-colors hover:bg-white/20"
-              >
-                <div className={`w-6 h-6 bg-accent rounded-full shadow-lg transition-transform duration-300 ${billingPeriod === 'yearly' ? 'translate-x-8' : 'translate-x-0'}`} />
-              </button>
-              <div className="flex items-center gap-2">
-                <span className={`text-sm font-bold tracking-widest uppercase transition-colors ${billingPeriod === 'yearly' ? 'text-white' : 'text-white/40'}`}>Yearly</span>
-                <span className="bg-accent/20 text-accent text-[10px] font-black px-2 py-1 rounded-full border border-accent/30">SAVE 20%</span>
-              </div>
+      {/* Hero */}
+      <div className="relative pt-36 pb-28 px-6 bg-[#0B2B1C] overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_70%_-10%,rgba(178,215,30,0.16)_0%,transparent_65%)]" />
+        <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1] }}>
+            <div className="inline-flex items-center gap-2 border border-white/10 bg-white/5 px-3.5 py-1.5 rounded-full mb-7">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#B2D71E]" />
+              <span className="text-white/50 text-[10px] font-semibold tracking-[0.2em] uppercase">Pricing</span>
+            </div>
+            <h1 className="font-sora font-bold text-[48px] lg:text-[64px] text-white leading-[1.07] tracking-[-0.03em] mb-5">
+              Invest in your<br /><span className="text-[#B2D71E]">growth.</span>
+            </h1>
+            <p className="text-white/45 text-[16px] max-w-md mx-auto mb-10 leading-[1.8]">Transparent, scalable pricing for every stage of business. No hidden fees.</p>
+            <div className="inline-flex items-center gap-1 bg-white/[0.06] border border-white/10 rounded-xl p-1.5">
+              {['monthly', 'yearly'].map(p => (
+                <button key={p} onClick={() => setBillingPeriod(p)}
+                  className={`px-5 py-2 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-all ${billingPeriod === p ? 'bg-[#B2D71E] text-[#0B2B1C] shadow-sm' : 'text-white/40 hover:text-white/70'}`}>
+                  {p === 'yearly' ? 'Yearly — save 20%' : 'Monthly'}
+                </button>
+              ))}
             </div>
           </motion.div>
         </div>
       </div>
 
-      <div className="relative -mt-16 pb-24 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-3 gap-8 mb-24">
-            {plans.map((plan, index) => (
-              <motion.div
-                key={index}
-                {...fadeInUp}
-                transition={{ delay: index * 0.1 }}
-                className={`bg-white rounded-[2.5rem] p-10 border-2 relative flex flex-col transition-all duration-500 group hover:-translate-y-3 ${
-                  plan.popular 
-                    ? 'border-accent shadow-[0_40px_80px_-15px_rgba(200,233,71,0.2)] ring-8 ring-accent/5' 
-                    : 'border-slate-100 hover:border-slate-300 shadow-sm'
-                }`}
-              >
+      <div className="relative -mt-10 pb-20 px-6">
+        <div className="max-w-6xl mx-auto">
+
+          {/* Plan cards */}
+          <div className="grid lg:grid-cols-3 gap-5 mb-16">
+            {plans.map((plan, i) => (
+              <motion.div key={i} {...fadeIn} transition={{ delay: i * 0.08, duration: 0.65 }}
+                className={`rounded-2xl p-7 border-2 flex flex-col relative transition-all hover:-translate-y-2 duration-300 group ${plan.popular ? 'bg-[#0B2B1C] border-[#0B2B1C] shadow-2xl shadow-[#0B2B1C]/20' : 'bg-white border-slate-100 hover:border-slate-200 shadow-sm hover:shadow-xl'}`}>
                 {plan.popular && (
-                  <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-primary text-accent px-8 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl border border-accent/20">
-                    Most Popular Choice
-                  </div>
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#B2D71E] text-[#0B2B1C] text-[9px] font-bold uppercase tracking-widest px-5 py-1.5 rounded-full shadow-md">Most popular</div>
                 )}
-                
-                <div className="mb-8">
-                  <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-6 transition-all duration-500 ${
-                    plan.popular 
-                      ? 'bg-primary text-accent rotate-[-6deg] group-hover:rotate-0' 
-                      : 'bg-slate-50 text-slate-400 group-hover:bg-primary/5 group-hover:text-primary group-hover:scale-110'
-                  }`}>
-                    <plan.icon className="h-8 w-8" />
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-5 ${plan.popular ? 'bg-[#B2D71E]' : 'bg-slate-50 group-hover:bg-[#0B2B1C]/5 transition-colors'}`}>
+                  <plan.icon className={`h-5 w-5 ${plan.popular ? 'text-[#0B2B1C]' : 'text-slate-400 group-hover:text-[#0B2B1C] transition-colors'}`} />
+                </div>
+                <h3 className={`font-sora font-bold text-[20px] mb-1 ${plan.popular ? 'text-white' : 'text-[#0B2B1C]'}`}>{plan.name}</h3>
+                <p className={`text-[12px] mb-6 leading-relaxed ${plan.popular ? 'text-white/40' : 'text-slate-400'}`}>{plan.desc}</p>
+                <div className={`mb-7 p-4 rounded-xl border ${plan.popular ? 'bg-white/[0.04] border-white/[0.07]' : 'bg-slate-50/60 border-slate-100/60'}`}>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className={`font-sora font-bold text-[38px] tracking-[-0.02em] ${plan.popular ? 'text-white' : 'text-[#0B2B1C]'}`}>₹{billingPeriod === 'monthly' ? plan.mp : plan.yp}</span>
+                    <span className={`text-[10px] font-medium uppercase tracking-widest ${plan.popular ? 'text-white/30' : 'text-slate-400'}`}>{plan.period}</span>
                   </div>
-                  <h3 className="font-heading font-black text-3xl text-primary mb-2 tracking-tight">{plan.name}</h3>
-                  <p className="text-slate-600 text-sm leading-relaxed font-medium">{plan.description}</p>
                 </div>
-
-                <div className="mb-10 p-6 bg-slate-50/50 rounded-lg border border-slate-100/50">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-5xl font-black text-primary tracking-tighter transition-all">
-                      ₹{billingPeriod === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice}
-                    </span>
-                    <span className="text-slate-400 font-bold text-xs uppercase tracking-widest">{plan.period}</span>
-                  </div>
-                  {billingPeriod === 'yearly' && plan.monthlyPrice !== '0' && (
-                    <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-accent-dark text-[10px] font-black mt-2 text-primary/40 uppercase tracking-wider">
-                      Billed annually (Save substantial)
-                    </motion.p>
-                  )}
-                </div>
-
-                <div className="flex-grow">
-                  <ul className="space-y-5 mb-12">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-start gap-4 group/item">
-                        <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center mt-0.5 transition-colors ${
-                          plan.popular ? 'bg-accent/20 text-primary' : 'bg-slate-100 text-slate-400 group-hover/item:bg-primary/10 group-hover/item:text-primary'
-                        }`}>
-                          <Check className="h-3 w-3 stroke-[4]" />
-                        </div>
-                        <span className="text-slate-700 font-semibold text-sm tracking-tight">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <Link to="/signup" className="mt-auto">
-                  <Button
-                    size="lg"
-                    className={`w-full rounded-lg py-9 text-lg font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 active:scale-95 shadow-2xl ${
-                      plan.popular
-                        ? 'bg-primary hover:bg-primary/95 text-white shadow-primary/20'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-800 shadow-transparent hover:shadow-slate-200/50'
-                    }`}
-                  >
-                    {plan.cta}
-                    <ArrowRight className={`h-5 w-5 ${plan.popular ? 'text-accent' : 'text-primary'}`} />
+                <ul className="space-y-3 mb-8 flex-grow">
+                  {plan.features.map((f, j) => (
+                    <li key={j} className="flex items-start gap-3">
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${plan.popular ? 'bg-[#B2D71E]/15' : 'bg-[#0B2B1C]/6'}`}>
+                        <Check className={`h-2.5 w-2.5 stroke-[3] ${plan.popular ? 'text-[#B2D71E]' : 'text-[#0B2B1C]'}`} />
+                      </div>
+                      <span className={`text-[13px] font-medium ${plan.popular ? 'text-white/60' : 'text-slate-600'}`}>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/signup">
+                  <Button className={`w-full rounded-xl h-11 font-semibold text-[13px] gap-2 transition-all ${plan.popular ? 'bg-[#B2D71E] hover:bg-[#c5ef20] text-[#0B2B1C] shadow-md shadow-[#B2D71E]/20' : 'bg-[#0B2B1C] hover:bg-[#0B2B1C]/90 text-white'}`}>
+                    {plan.cta}<ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
               </motion.div>
             ))}
           </div>
 
-          {/* Trust Section */}
-          <motion.div {...fadeInUp} className="grid md:grid-cols-3 gap-8 py-16 border-y border-slate-200/60 mb-24">
-            {[
-              { title: 'Secure Payments', desc: 'PCI-DSS compliant processing', icon: ShieldCheck },
-              { title: 'Cancel Anytime', desc: 'No long-term contracts', icon: Zap },
-              { title: 'Gst Invoicing', desc: 'Download GST-ready bills', icon: Star }
-            ].map((box, i) => (
-              <div key={i} className="flex items-center gap-5 px-8">
-                <div className="w-12 h-12 rounded-lg bg-white shadow-sm flex items-center justify-center text-primary group hover:bg-primary hover:text-white transition-all">
-                   <box.icon className="h-6 w-6" />
+          {/* Trust row */}
+          <motion.div {...fadeIn} className="grid md:grid-cols-3 gap-4 py-10 border-y border-slate-100/80 mb-16">
+            {[{title:'Secure Payments',desc:'PCI-DSS compliant processing',icon:ShieldCheck},{title:'Cancel Anytime',desc:'No long-term contracts',icon:Zap},{title:'GST Invoicing',desc:'Download GST-ready tax invoices',icon:Star}].map((box,i)=>(
+              <div key={i} className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100">
+                <div className="w-10 h-10 rounded-xl bg-[#0B2B1C]/5 flex items-center justify-center flex-shrink-0">
+                  <box.icon className="h-4.5 w-4.5 text-[#0B2B1C] h-[18px] w-[18px]" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-primary">{box.title}</h4>
-                  <p className="text-sm text-slate-600 font-medium">{box.desc}</p>
+                  <p className="font-semibold text-[#0B2B1C] text-[13px]">{box.title}</p>
+                  <p className="text-slate-400 text-[12px] mt-0.5">{box.desc}</p>
                 </div>
               </div>
             ))}
           </motion.div>
 
-          {/* Detailed Comparison Table */}
-          <div className="mt-32 max-w-5xl mx-auto overflow-hidden">
-            <motion.div {...fadeInUp} className="text-center mb-16">
-              <h3 className="font-heading font-black text-4xl text-primary mb-4">Compare Features</h3>
-              <p className="text-slate-600 font-medium text-lg">Deep dive into the specifics of each plan.</p>
-            </motion.div>
-            
-            <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl overflow-hidden backdrop-blur-sm">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/80">
-                    <th className="p-8 text-xs font-black uppercase tracking-widest text-slate-400">Features</th>
-                    <th className="p-8 text-xs font-black uppercase tracking-widest text-primary">Starter</th>
-                    <th className="p-8 text-xs font-black uppercase tracking-widest text-primary">Business</th>
-                    <th className="p-8 text-xs font-black uppercase tracking-widest text-primary">Enterprise</th>
+          {/* Comparison table */}
+          <motion.div {...fadeIn} className="text-center mb-10">
+            <h3 className="font-sora font-bold text-[30px] text-[#0B2B1C] tracking-[-0.02em] mb-2">Compare plans</h3>
+            <p className="text-slate-400 text-[14px]">Deep dive into what's included at each tier.</p>
+          </motion.div>
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-16">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="p-5 text-[9px] font-bold uppercase tracking-widest text-slate-400">Feature</th>
+                  {['Starter','Business','Enterprise'].map(n=><th key={n} className="p-5 text-[9px] font-bold uppercase tracking-widest text-[#0B2B1C]">{n}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  {label:'Bank Statement Imports',vals:['5/mo','25/mo','Unlimited']},
+                  {label:'AI Classification',vals:[true,true,true]},
+                  {label:'GST Reports',vals:[false,true,true]},
+                  {label:'Multi-User Support',vals:[false,false,true]},
+                  {label:'API Access',vals:[false,false,true]},
+                  {label:'Priority Support',vals:[false,true,true]},
+                  {label:'Custom PDF Reports',vals:[true,true,true]},
+                ].map((row,i)=>(
+                  <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                    <td className="p-5 text-[13px] font-medium text-slate-700">{row.label}</td>
+                    {row.vals.map((v,j)=>(
+                      <td key={j} className="p-5">
+                        {typeof v==='boolean'
+                          ? v ? <div className="w-5 h-5 rounded-full bg-[#B2D71E] flex items-center justify-center"><Check className="h-2.5 w-2.5 text-[#0B2B1C] stroke-[3]" /></div>
+                              : <X className="h-4 w-4 text-slate-200" />
+                          : <span className="font-sora font-semibold text-[13px] text-[#0B2B1C]">{v}</span>
+                        }
+                      </td>
+                    ))}
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {[
-                    { label: 'Bank Statement Imports', vals: ['5/mo', '25/mo', 'Unlimited'] },
-                    { label: 'AI Classification', vals: [true, true, true] },
-                    { label: 'Multi-User Support', vals: [false, false, true] },
-                    { label: 'API Access', vals: [false, false, true] },
-                    { label: 'Priority Support', vals: [false, true, true] },
-                    { label: 'Custom PDF Reports', vals: [true, true, true] },
-                  ].map((row, i) => (
-                    <tr key={i} className="hover:bg-slate-50/30 transition-colors">
-                      <td className="p-8 text-sm font-bold text-slate-700">{row.label}</td>
-                      {row.vals.map((v, j) => (
-                        <td key={j} className="p-8">
-                          {typeof v === 'boolean' ? (
-                            v ? <Check className="h-5 w-5 text-accent stroke-[3]" /> : <X className="h-5 w-5 text-slate-200" />
-                          ) : (
-                            <span className="text-sm font-black text-primary">{v}</span>
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
 
-          <motion.div {...fadeInUp} className="mt-32 text-center p-16 bg-primary rounded-[4rem] relative overflow-hidden shadow-2xl">
-             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(200,233,71,0.1)_0%,rgba(0,0,0,0)_70%)]" />
-             <div className="relative z-10">
-               <h3 className="font-heading font-black text-3xl text-white mb-4">Still have questions?</h3>
-               <p className="text-white/60 mb-10 max-w-xl mx-auto font-medium text-lg leading-relaxed">
-                 We're here to help you choose the right plan for your current business needs and future growth.
-               </p>
-               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                 <Link to="/faq">
-                    <Button className="rounded-full px-12 py-8 bg-accent hover:bg-accent/90 text-primary font-black uppercase tracking-widest text-xs shadow-xl shadow-accent/20">
-                      Read the FAQ
-                    </Button>
-                 </Link>
-                 <Link to="/contact">
-                    <Button variant="outline" className="rounded-full px-12 py-8 border-2 border-white/20 text-white hover:bg-white hover:text-primary font-black uppercase tracking-widest text-xs">
-                      Contact Support
-                    </Button>
-                 </Link>
-               </div>
-             </div>
+          {/* Bottom CTA */}
+          <motion.div {...fadeIn} className="bg-[#0B2B1C] rounded-2xl p-12 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_50%_50%_at_30%_30%,rgba(178,215,30,0.1)_0%,transparent_70%)]" />
+            <div className="relative z-10">
+              <h3 className="font-sora font-bold text-[26px] text-white mb-2">Still have questions?</h3>
+              <p className="text-white/40 mb-7 max-w-md mx-auto text-[14px] leading-relaxed">We're here to help you find the right plan for your needs and future growth.</p>
+              <div className="flex flex-wrap gap-3 justify-center">
+                <Link to="/faq"><Button className="h-11 px-7 bg-[#B2D71E] hover:bg-[#c5ef20] text-[#0B2B1C] rounded-xl font-semibold text-[13px] shadow-md shadow-[#B2D71E]/20">Browse FAQ</Button></Link>
+                <Link to="/contact"><Button variant="ghost" className="h-11 px-7 text-white/50 hover:text-white hover:bg-white/[0.07] rounded-xl font-medium text-[13px] border border-white/10">Contact support</Button></Link>
+              </div>
+            </div>
           </motion.div>
         </div>
       </div>
-      
+
       <Footer />
     </div>
   );

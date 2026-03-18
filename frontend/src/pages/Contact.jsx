@@ -7,233 +7,144 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Mail, Phone, MapPin, MessageSquare, Send, Globe, ShieldCheck } from 'lucide-react';
+import { Mail, Phone, MapPin, MessageSquare, Send, ShieldCheck } from 'lucide-react';
+
+const FONT_STYLE = `
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Geist:wght@300;400;500;600&display=swap');
+  *, body { font-family: 'Geist', 'Geist Fallback', -apple-system, sans-serif; }
+  .font-sora { font-family: 'Sora', sans-serif; }
+`;
 
 const Contact = () => {
-    const [loading, setLoading] = useState(false);
-    const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        message: '',
-    });
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({ name: '', email: '', message: '' });
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        toast.success('Your message has been sent successfully! Our team will reach out within 24 hours.');
-        setFormData({ name: '', email: '', message: '' });
-        setLoading(false);
-    };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    toast.success('Message sent! Our team will reach out within 24 hours.');
+    setFormData({ name: '', email: '', message: '' });
+    setLoading(false);
+  };
 
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: {
-                staggerChildren: 0.15
-            }
-        }
-    };
+  const inputCls = "h-12 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:border-[#0B2B1C]/20 focus:ring-2 focus:ring-[#0B2B1C]/5 transition-all px-4 text-slate-700 placeholder:text-slate-300 text-[13px]";
+  const labelCls = "text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 block";
 
-    const itemVariants = {
-        hidden: { opacity: 0, y: 20 },
-        visible: { 
-            opacity: 1, 
-            y: 0,
-            transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
-        }
-    };
+  return (
+    <div className="min-h-screen bg-[#F6F6F3] flex flex-col">
+      <style>{FONT_STYLE}</style>
+      <Navbar />
+      <main className="flex-1 flex flex-col">
 
-    return (
-        <div className="min-h-screen bg-slate-50 flex flex-col overflow-x-hidden">
-            <Navbar />
-            
-            <main className="flex-1 flex flex-col">
-                {/* Hero Section */}
-                <div className="relative pt-44 pb-32 px-6 overflow-hidden bg-primary text-center">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(200,233,71,0.12)_0%,rgba(0,0,0,0)_70%)]" />
-                    
-                    <div className="max-w-4xl mx-auto relative z-10">
-                        <motion.div 
-                            initial={{ opacity: 0, y: 30 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.8 }}
-                        >
-                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 mb-8 backdrop-blur-sm">
-                                <MessageSquare className="w-4 h-4 text-accent" />
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">Global Support</span>
-                            </div>
-                            <h1 className="font-heading font-extrabold text-5xl lg:text-7xl text-white mb-8 tracking-tight leading-[1.1]">
-                                How can we <span className="text-accent italic underline decoration-accent/30 underline-offset-8">help</span> you?
-                            </h1>
-                            <p className="max-w-2xl mx-auto text-lg lg:text-xl text-white/70 font-medium leading-relaxed">
-                                Whether you have questions about our enterprise solutions or need technical assistance, our elite support team is standing by.
-                            </p>
-                            <div className="mt-12 flex justify-center">
-                                <div className="w-20 h-1.5 bg-accent rounded-full animate-pulse opacity-50" />
-                            </div>
-                        </motion.div>
-                    </div>
-                </div>
-
-                <div className="py-24 px-6 lg:px-12 relative z-10">
-                    <div className="max-w-7xl mx-auto relative">
-                        {/* Decorative background elements for content area */}
-                        <div className="absolute top-0 left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
-                        <div className="absolute bottom-20 right-[-10%] w-[30%] h-[30%] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
-
-
-                    <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-start">
-                        {/* Info Cards Side */}
-                        <motion.div 
-                            variants={containerVariants}
-                            initial="hidden"
-                            animate="visible"
-                            className="lg:col-span-5 space-y-6"
-                        >
-                            <motion.div variants={itemVariants} className="group p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_20px_40px_-12px_rgba(15,57,43,0.08)] hover:shadow-[0_40px_80px_-24px_rgba(15,57,43,0.12)] transition-all duration-500">
-                                <div className="flex items-center gap-6">
-                                    <div className="w-16 h-16 rounded-lg bg-[#0F392B] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
-                                        <Mail className="w-8 h-8 text-accent" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-heading font-bold text-xl text-primary mb-1">Email Support</h3>
-                                        <p className="text-slate-600 font-medium">support@vitta.in</p>
-                                    </div>
-                                </div>
-                            </motion.div>
-
-                            <motion.div variants={itemVariants} className="group p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_20px_40px_-12px_rgba(15,57,43,0.08)] hover:shadow-[0_40px_80px_-24px_rgba(15,57,43,0.12)] transition-all duration-500">
-                                <div className="flex items-center gap-6">
-                                    <div className="w-16 h-16 rounded-lg bg-accent flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
-                                        <Phone className="w-8 h-8 text-primary" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-heading font-bold text-xl text-primary mb-1">Direct Call</h3>
-                                        <p className="text-slate-600 font-medium">+91 1800-VITTA-HLP</p>
-                                    </div>
-                                </div>
-                            </motion.div>
-
-                            <motion.div variants={itemVariants} className="group p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_20px_40px_-12px_rgba(15,57,43,0.08)] hover:shadow-[0_40px_80px_-24px_rgba(15,57,43,0.12)] transition-all duration-500">
-                                <div className="flex items-center gap-6">
-                                    <div className="w-16 h-16 rounded-lg bg-[#F0F4F2] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
-                                        <MapPin className="w-8 h-8 text-primary" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-heading font-bold text-xl text-primary mb-1">Headquarters</h3>
-                                        <p className="text-slate-600 font-medium">B-Block, TechHub, Mumbai, MH</p>
-                                    </div>
-                                </div>
-                            </motion.div>
-
-                            <motion.div variants={itemVariants} className="p-8 bg-primary rounded-[2.5rem] text-white relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-accent/20 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700" />
-                                <div className="relative z-10">
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <ShieldCheck className="w-5 h-5 text-accent" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-accent">Enterprise Ready</span>
-                                    </div>
-                                    <h4 className="font-heading font-bold text-2xl mb-2">Need a demo?</h4>
-                                    <p className="text-white/60 mb-6">Our solutions experts can walk you through the entire Vitta automation workflow.</p>
-                                    <Button variant="outline" className="rounded-full border-white/20 text-white hover:bg-white hover:text-primary transition-all px-8 py-6 h-auto font-bold uppercase tracking-widest text-xs">
-                                        Schedule Demo
-                                    </Button>
-                                </div>
-                            </motion.div>
-                        </motion.div>
-
-                        {/* Form Side */}
-                        <motion.div 
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.8, delay: 0.3 }}
-                            className="lg:col-span-7 bg-white rounded-[4rem] border border-slate-100 p-10 lg:p-16 shadow-[0_32px_64px_-16px_rgba(15,57,43,0.12)]"
-                        >
-                            <div className="mb-12">
-                                <h2 className="font-heading font-extrabold text-3xl lg:text-4xl text-primary mb-4 text-center lg:text-left">Send us a message</h2>
-                                <p className="text-slate-600 font-medium text-center lg:text-left">Use the form below and we'll route your inquiry to the correct department.</p>
-                            </div>
-
-                            <form onSubmit={handleSubmit} className="space-y-8">
-                                <div className="grid md:grid-cols-2 gap-6">
-                                    <div className="space-y-3">
-                                        <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Full Name</Label>
-                                        <Input
-                                            required
-                                            value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            placeholder="John Doe"
-                                            className="h-16 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
-                                        />
-                                    </div>
-                                    <div className="space-y-3">
-                                        <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Work Email</Label>
-                                        <Input
-                                            required
-                                            type="email"
-                                            value={formData.email}
-                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            placeholder="name@company.com"
-                                            className="h-16 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <Label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Your Message</Label>
-                                    <Textarea
-                                        required
-                                        value={formData.message}
-                                        onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                                        placeholder="How can Vitta help your business today?"
-                                        className="min-h-[200px] rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 py-5 text-slate-700 placeholder:text-slate-400 resize-none"
-                                    />
-                                </div>
-
-                                <div className="pt-4 flex justify-center lg:justify-start">
-                                    <Button
-                                        type="submit"
-                                        disabled={loading}
-                                        className="w-full lg:w-auto min-w-[240px] h-16 rounded-lg bg-gradient-to-r from-primary to-[#16523E] hover:from-primary/95 hover:to-[#16523E]/95 text-white font-black uppercase tracking-widest shadow-[0_20px_40px_-12px_rgba(15,57,43,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98] border-t border-white/10 px-10 group"
-                                    >
-                                        {loading ? (
-                                            <span className="flex items-center gap-2">
-                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                Sending...
-                                            </span>
-                                        ) : (
-                                            <span className="flex items-center gap-2">
-                                                Send Inquiry
-                                                <Send className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                                            </span>
-                                        )}
-                                    </Button>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Footer Trust Section */}
-                <div className="mt-24 py-12 border-y border-slate-100 bg-white/50 backdrop-blur-sm overflow-hidden">
-                    <div className="max-w-7xl mx-auto px-6">
-                        <div className="flex flex-wrap items-center justify-center gap-12 lg:gap-24 opacity-30 grayscale hover:grayscale-0 transition-all duration-500">
-                            <span className="font-heading font-black text-2xl tracking-tighter">BANK OF CORE</span>
-                            <span className="font-heading font-black text-2xl tracking-tighter">FINANCE.CO</span>
-                            <span className="font-heading font-black text-2xl tracking-tighter">ELITE ASSETS</span>
-                            <span className="font-heading font-black text-2xl tracking-tighter">GLOBAL TRUST</span>
-                        </div>
-                    </div>
-                </div>
-            </main>
-
-            <Footer />
+        {/* Hero */}
+        <div className="relative pt-36 pb-20 px-6 bg-[#0B2B1C] overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_30%_-10%,rgba(178,215,30,0.15)_0%,transparent_65%)]" />
+          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+          <div className="max-w-4xl mx-auto text-center relative z-10">
+            <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1] }}>
+              <div className="inline-flex items-center gap-2 border border-white/10 bg-white/5 px-3.5 py-1.5 rounded-full mb-7">
+                <MessageSquare className="w-3.5 h-3.5 text-[#B2D71E]" />
+                <span className="text-white/50 text-[10px] font-semibold tracking-[0.2em] uppercase">Support</span>
+              </div>
+              <h1 className="font-sora font-bold text-[48px] lg:text-[64px] text-white leading-[1.07] tracking-[-0.03em] mb-5">
+                How can we<br /><span className="text-[#B2D71E]">help you?</span>
+              </h1>
+              <p className="text-white/45 text-[16px] max-w-lg mx-auto leading-[1.8]">Questions about enterprise solutions or need technical assistance? Our team is standing by.</p>
+            </motion.div>
+          </div>
         </div>
-    );
+
+        <div className="py-16 px-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid lg:grid-cols-12 gap-8 items-start">
+
+              {/* Info cards */}
+              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }} className="lg:col-span-4 space-y-3">
+                {[
+                  { icon: Mail, bg: 'bg-[#0B2B1C]', ic: 'text-[#B2D71E]', title: 'Email Support', value: 'support@vitta.in' },
+                  { icon: Phone, bg: 'bg-[#B2D71E]', ic: 'text-[#0B2B1C]', title: 'Direct Call', value: '+91 1800-VITTA-HLP' },
+                  { icon: MapPin, bg: 'bg-slate-50', ic: 'text-slate-600', title: 'Headquarters', value: 'B-Block, TechHub, Mumbai, MH' },
+                ].map((item, i) => (
+                  <motion.div key={i} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08, duration: 0.65 }}
+                    className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 hover:shadow-md transition-all duration-300 group">
+                    <div className={`w-11 h-11 rounded-xl ${item.bg} flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform`}>
+                      <item.icon className={`w-5 h-5 ${item.ic}`} />
+                    </div>
+                    <div>
+                      <p className="font-sora font-semibold text-[#0B2B1C] text-[13px]">{item.title}</p>
+                      <p className="text-slate-400 text-[12px] mt-0.5">{item.value}</p>
+                    </div>
+                  </motion.div>
+                ))}
+
+                {/* Demo card */}
+                <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28, duration: 0.65 }}
+                  className="p-6 bg-[#0B2B1C] rounded-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-28 h-28 bg-[#B2D71E]/8 rounded-full blur-2xl" />
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-2 mb-3">
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#B2D71E]" />
+                      <span className="text-[#B2D71E] text-[9px] font-bold uppercase tracking-widest">Enterprise</span>
+                    </div>
+                    <h4 className="font-sora font-semibold text-white text-[16px] mb-1.5">Need a demo?</h4>
+                    <p className="text-white/40 text-[12px] mb-5 leading-relaxed">Our experts will walk you through the entire Vitta workflow.</p>
+                    <Button variant="outline" className="rounded-xl border-white/15 text-white hover:bg-white hover:text-[#0B2B1C] transition-all h-10 px-5 font-medium text-[12px]">
+                      Schedule a demo
+                    </Button>
+                  </div>
+                </motion.div>
+              </motion.div>
+
+              {/* Form */}
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.75, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                className="lg:col-span-8 bg-white rounded-2xl border border-slate-100 p-9 shadow-sm">
+                <div className="mb-7">
+                  <h2 className="font-sora font-bold text-[22px] text-[#0B2B1C] mb-1.5">Send us a message</h2>
+                  <p className="text-slate-400 text-[13px]">We'll route your inquiry to the right team and respond promptly.</p>
+                </div>
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className={labelCls}>Full Name</Label>
+                      <Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="John Doe" className={inputCls} />
+                    </div>
+                    <div>
+                      <Label className={labelCls}>Work Email</Label>
+                      <Input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="name@company.com" className={inputCls} />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className={labelCls}>Your Message</Label>
+                    <Textarea required value={formData.message} onChange={e => setFormData({...formData, message: e.target.value})} placeholder="How can Vitta help your business today?" className="min-h-[160px] rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:border-[#0B2B1C]/20 focus:ring-2 focus:ring-[#0B2B1C]/5 transition-all px-4 py-3.5 text-slate-700 placeholder:text-slate-300 text-[13px] resize-none" />
+                  </div>
+                  <Button type="submit" disabled={loading} className="h-11 px-8 bg-[#0B2B1C] hover:bg-[#0B2B1C]/90 text-white rounded-xl font-semibold text-[13px] shadow-md shadow-[#0B2B1C]/15 transition-all hover:scale-[1.01] active:scale-[0.99] gap-2.5">
+                    {loading
+                      ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Sending…</>
+                      : <>Send inquiry <Send className="w-3.5 h-3.5" /></>
+                    }
+                  </Button>
+                </form>
+              </motion.div>
+            </div>
+          </div>
+        </div>
+
+        {/* Trust logos */}
+        <div className="py-8 border-t border-slate-100">
+          <div className="max-w-6xl mx-auto px-6">
+            <p className="text-center text-[9px] font-semibold uppercase tracking-widest text-slate-300 mb-5">Trusted by</p>
+            <div className="flex flex-wrap items-center justify-center gap-10 opacity-20">
+              {['BANK OF CORE', 'FINANCE.CO', 'ELITE ASSETS', 'GLOBAL TRUST'].map(name => (
+                <span key={name} className="font-sora font-semibold text-[16px] tracking-tight text-slate-500">{name}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
 };
 
 export default Contact;

@@ -10,7 +10,7 @@ export const Navbar = () => {
   const [activeHover, setActiveHover] = useState(null);
   const location = useLocation();
 
-  const isLightPage = ['/login', '/signup'].includes(location.pathname);
+  const isLightPage = location.pathname !== '/';
   const shouldShowSolid = scrolled || isLightPage;
 
   useEffect(() => {

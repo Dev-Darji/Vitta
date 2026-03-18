@@ -95,8 +95,9 @@ const Clients = () => {
 
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-slate-900 hover:bg-black text-white h-9 px-5 rounded-lg text-[13px] font-semibold shadow-sm flex items-center gap-2">
-              <Plus className="h-4 w-4" />Add Client
+            <Button className="bg-slate-900 hover:bg-black text-white h-9 px-5 rounded-lg flex items-center gap-2 shadow-sm focus:ring-0">
+              <Plus className="h-4 w-4" />
+              <span className="text-[13px] font-semibold translate-y-[-0.5px]">Add Client</span>
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[440px] rounded-2xl border border-slate-100 shadow-2xl p-0 overflow-hidden bg-white">

@@ -7,394 +7,202 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import api from '@/lib/api';
-import { Eye, EyeOff, ShieldCheck, Zap, Globe, Lock } from 'lucide-react';
+import { Eye, EyeOff, ShieldCheck, Zap, Globe, Lock, ArrowRight } from 'lucide-react';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 
+const FONT_STYLE = `
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Geist:wght@300;400;500;600&display=swap');
+  *, body { font-family: 'Geist', 'Geist Fallback', -apple-system, sans-serif; }
+  .font-sora { font-family: 'Sora', sans-serif; }
+`;
+
 const AuthPage = () => {
-    const navigate = useNavigate();
-    const location = useLocation();
-    
-    // Determine initial mode from URL
-    const isSignupInitial = location.pathname === '/signup';
-    const [isLogin, setIsLogin] = useState(!isSignupInitial);
-    const [loading, setLoading] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [isLogin, setIsLogin] = useState(location.pathname === '/login');
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' });
 
-    const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        password: '',
-        confirmPassword: '',
-    });
+  useEffect(() => { setIsLogin(location.pathname === '/login'); }, [location.pathname]);
+  const handleToggle = () => navigate(isLogin ? '/signup' : '/login');
 
-    // Sync mode with URL changes
-    useEffect(() => {
-        setIsLogin(location.pathname === '/login');
-    }, [location.pathname]);
+  const handleLogin = async (e) => {
+    e.preventDefault(); setLoading(true);
+    try {
+      const res = await api.post('/auth/login', { email: formData.email, password: formData.password });
+      localStorage.setItem('token', res.data.access_token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      toast.success('Welcome back to Vitta!');
+      navigate('/dashboard');
+    } catch (err) { toast.error(err.response?.data?.detail || 'Login failed'); }
+    finally { setLoading(false); }
+  };
 
-    const handleToggle = () => {
-        const newMode = isLogin ? '/signup' : '/login';
-        navigate(newMode);
-    };
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    if (formData.password !== formData.confirmPassword) { toast.error('Passwords do not match'); return; }
+    if (!agreedToTerms) { toast.error('Please agree to our terms'); return; }
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/register', { name: formData.name, email: formData.email, password: formData.password });
+      localStorage.setItem('token', res.data.access_token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      toast.success('Account created successfully!');
+      navigate('/dashboard');
+    } catch (err) { toast.error(err.response?.data?.detail || 'Registration failed'); }
+    finally { setLoading(false); }
+  };
 
-    const handleLoginSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            const response = await api.post('/auth/login', {
-                email: formData.email,
-                password: formData.password
-            });
-            localStorage.setItem('token', response.data.access_token);
-            localStorage.setItem('user', JSON.stringify(response.data.user));
-            toast.success('Welcome back to Vitta!');
-            navigate('/dashboard');
-        } catch (error) {
-            toast.error(error.response?.data?.detail || 'Login failed');
-        } finally {
-            setLoading(false);
-        }
-    };
+  const inputCls = "h-12 rounded-xl bg-[#F6F6F3] border-slate-200 focus:bg-white focus:border-[#0B2B1C]/20 focus:ring-2 focus:ring-[#0B2B1C]/5 transition-all px-4 text-slate-700 placeholder:text-slate-300 text-[13px]";
+  const labelCls = "text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 block";
 
-    const handleSignupSubmit = async (e) => {
-        e.preventDefault();
-        if (formData.password !== formData.confirmPassword) {
-            toast.error('Passwords do not match');
-            return;
-        }
-        if (!agreedToTerms) {
-            toast.error('Please agree to our terms');
-            return;
-        }
+  return (
+    <div className="min-h-screen bg-[#F0F0ED] flex flex-col">
+      <style>{FONT_STYLE}</style>
+      <Navbar />
+      <main className="flex-1 flex items-center justify-center pt-24 pb-12 px-4">
+        <div className="absolute top-28 left-[5%] w-[30%] h-[45%] bg-[#0B2B1C]/[0.04] rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-16 right-[5%] w-[25%] h-[40%] bg-[#B2D71E]/[0.07] rounded-full blur-3xl pointer-events-none" />
 
-        setLoading(true);
-        try {
-            const response = await api.post('/auth/register', {
-                name: formData.name,
-                email: formData.email,
-                password: formData.password,
-            });
-            localStorage.setItem('token', response.data.access_token);
-            localStorage.setItem('user', JSON.stringify(response.data.user));
-            toast.success('Account created successfully!');
-            navigate('/dashboard');
-        } catch (error) {
-            toast.error(error.response?.data?.detail || 'Registration failed');
-        } finally {
-            setLoading(false);
-        }
-    };
+        <div className="w-full max-w-5xl min-h-[640px] bg-white rounded-[2rem] shadow-[0_20px_60px_-10px_rgba(11,43,28,0.12)] border border-slate-100/80 flex overflow-hidden relative">
 
-    return (
-        <div className="min-h-screen bg-slate-50 overflow-x-hidden flex flex-col">
-            <Navbar />
-            
-            <main className="flex-1 flex items-center justify-center pt-28 pb-16 px-4 relative">
-                {/* Background decorative elements */}
-                <div className="absolute top-40 left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute bottom-20 right-[-10%] w-[30%] h-[30%] bg-accent/10 rounded-full blur-3xl pointer-events-none" />
-
-                <div className="w-full max-w-7xl mx-auto min-h-[750px] bg-white rounded-[4rem] shadow-[0_32px_64px_-16px_rgba(15,57,43,0.12)] border border-slate-100 flex overflow-hidden relative">
-                    
-                    {/* Animated Image Overlay (45% Width) */}
-                    <motion.div
-                        className="absolute top-0 bottom-0 z-20 hidden lg:block bg-primary overflow-hidden"
-                        initial={false}
-                        animate={{ 
-                            width: '45%',
-                            left: isLogin ? '55%' : '0%',
-                            transition: { type: 'spring', stiffness: 80, damping: 20 }
-                        }}
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-br from-primary/90 via-primary/80 to-[#0A291F]/90 z-10" />
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(200,233,71,0.25)_0%,rgba(0,0,0,0)_80%)] opacity-70 z-10" />
-                        <motion.img
-                            src="https://images.unsplash.com/photo-1758608631036-7a2370684905?crop=entropy&cs=srgb&fm=jpg&q=85"
-                            alt="Visual"
-                            className="w-full h-full object-cover opacity-45 mix-blend-overlay absolute inset-0"
-                            animate={{ scale: [1, 1.05, 1] }}
-                            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-                        />
-                        
-                        <div className="relative z-30 h-full flex flex-col items-center justify-center p-20 text-center text-white">
-                            <AnimatePresence mode="wait">
-                                {isLogin ? (
-                                    <motion.div
-                                        key="login-msg"
-                                        initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                                        exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                                        className="max-w-xs"
-                                    >
-                                        <h2 className="font-heading font-extrabold text-5xl mb-6 leading-[1.1]">Elite Intelligence.</h2>
-                                        <p className="text-white/60 text-lg font-medium mb-8 leading-relaxed">The global standard for modern financial management. Join the inner circle.</p>
-                                        <div className="w-16 h-1.5 bg-accent rounded-full mb-12 mx-auto" />
-                                        
-                                        <div className="grid grid-cols-3 gap-5 pt-6 border-t border-white/10 items-center justify-center">
-                                            <div className="text-center">
-                                                <div className="text-accent font-black text-2xl">2K+</div>
-                                                <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Clients</div>
-                                            </div>
-                                            <div className="text-center">
-                                                <div className="text-accent font-black text-2xl">99%</div>
-                                                <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Accuracy</div>
-                                            </div>
-                                            <div className="text-center">
-                                                <div className="text-accent font-black text-2xl">100%</div>
-                                                <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Secure</div>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                ) : (
-                                    <motion.div
-                                        key="signup-msg"
-                                        initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                                        exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                                        className="max-w-xs"
-                                    >
-                                        <h2 className="font-heading font-extrabold text-5xl mb-6 leading-[1.1]">Modern Finances.</h2>
-                                        <p className="text-white/60 text-lg font-medium mb-8 leading-relaxed">Experience a faster, more intelligent way to handle your business bank statements.</p>
-                                        <div className="w-16 h-1.5 bg-accent rounded-full mb-12 mx-auto" />
-                                        
-                                        <div className="flex items-center justify-center gap-4 pt-6 border-t border-white/10 opacity-60">
-                                            <ShieldCheck className="text-white h-5 w-5" />
-                                            <Zap className="text-white h-5 w-5" />
-                                            <Globe className="text-white h-5 w-5" />
-                                            <Lock className="text-white h-5 w-5" />
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
+          {/* Sliding panel */}
+          <motion.div
+            className="absolute top-0 bottom-0 z-20 hidden lg:flex bg-[#0B2B1C] overflow-hidden"
+            animate={{ width: '42%', left: isLogin ? '58%' : '0%', transition: { type: 'spring', stiffness: 65, damping: 18 } }}
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_25%,rgba(178,215,30,0.18)_0%,transparent_65%)]" />
+            <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+            <motion.img
+              src="https://images.unsplash.com/photo-1758608631036-7a2370684905?crop=entropy&cs=srgb&fm=jpg&q=85"
+              alt=""
+              className="w-full h-full object-cover opacity-15 mix-blend-overlay absolute inset-0"
+              animate={{ scale: [1, 1.04, 1] }}
+              transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
+            />
+            <div className="relative z-10 h-full flex flex-col items-center justify-center px-10 py-14 text-center text-white w-full">
+              <AnimatePresence mode="wait">
+                {isLogin ? (
+                  <motion.div key="login-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.4 }} className="max-w-[220px]">
+                    <div className="w-10 h-[3px] bg-[#B2D71E] rounded-full mx-auto mb-7" />
+                    <h2 className="font-sora font-bold text-[30px] text-white mb-3 tracking-[-0.02em] leading-tight">Elite Financial Intelligence.</h2>
+                    <p className="text-white/45 text-[13px] leading-relaxed mb-9">The global standard for modern financial management.</p>
+                    <div className="grid grid-cols-3 gap-3 pt-7 border-t border-white/[0.08]">
+                      {[['2K+','Clients'],['99%','Accuracy'],['100%','Secure']].map(([v,l])=>(
+                        <div key={l} className="text-center">
+                          <p className="font-sora font-bold text-[18px] text-[#B2D71E]">{v}</p>
+                          <p className="text-white/30 text-[8px] font-semibold uppercase tracking-widest mt-0.5">{l}</p>
                         </div>
-                    </motion.div>
-
-                    {/* Form Areas (55% Width zones) */}
-                    <div className="flex-1 flex overflow-hidden relative bg-white">
-                        
-                        {/* Login Form Panel */}
-                        <motion.div 
-                            className="w-full lg:w-[55%] h-full flex items-center justify-center p-8 lg:p-16 absolute lg:relative z-10"
-                            animate={{ 
-                                x: isLogin ? '0%' : '-100%',
-                                opacity: isLogin ? 1 : 0,
-                                scale: isLogin ? 1 : 0.98,
-                                filter: isLogin ? 'blur(0px)' : 'blur(4px)'
-                            }}
-                            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-                        >
-                            <div className="w-full max-w-sm">
-                                <div className="mb-12">
-                                    <div className="flex items-center gap-2 mb-6">
-                                        <div className="px-3 py-1 bg-primary/5 border border-primary/10 rounded-full text-[10px] text-primary font-black uppercase tracking-widest">
-                                            Trusted Login
-                                        </div>
-                                    </div>
-                                    <h1 className="font-heading font-extrabold text-4xl text-primary mb-3">Welcome Back</h1>
-                                    <p className="text-slate-600 font-medium">Access your global financial headquarters.</p>
-                                </div>
-
-                                <form onSubmit={handleLoginSubmit} className="space-y-6">
-                                    <div className="space-y-2">
-                                        <Label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Business Email</Label>
-                                        <Input
-                                            type="email"
-                                            required
-                                            value={formData.email}
-                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            className="h-14 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
-                                            placeholder="name@company.com"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-center">
-                                            <Label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Password</Label>
-                                        </div>
-                                        <div className="relative">
-                                            <Input
-                                                type={showPassword ? 'text' : 'password'}
-                                                required
-                                                value={formData.password}
-                                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                                className="h-14 rounded-lg bg-white border-slate-300 focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
-                                                placeholder="••••••••"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowPassword(!showPassword)}
-                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                                            >
-                                                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-3 flex justify-center">
-                                        <Button
-                                            type="submit"
-                                            disabled={loading}
-                                            className="w-full h-14 rounded-lg bg-gradient-to-r from-primary to-[#16523E] hover:from-primary/95 hover:to-[#16523E]/95 text-white font-black uppercase tracking-widest shadow-[0_20px_40px_-12px_rgba(15,57,43,0.25)] transition-all hover:scale-[1.01] active:scale-[0.99] border-t border-white/10"
-                                        >
-                                            {loading ? 'Signing In...' : 'Sign In'}
-                                        </Button>
-                                    </div>
-                                </form>
-
-                                <div className="mt-4 pt-4 border-t border-slate-100">
-                                    <p className="text-sm text-slate-600 font-medium text-center">
-                                        New to the platform?{' '}
-                                        <button 
-                                            onClick={handleToggle}
-                                            className="text-primary font-black hover:text-primary/70 transition-all ml-1"
-                                        >
-                                            Create a free account
-                                        </button>
-                                    </p>
-                                </div>
-                            </div>
-                        </motion.div>
-
-                        {/* Sign Up Form Panel */}
-                        <motion.div 
-                            className="w-full lg:w-[55%] h-full flex items-center justify-center p-8 lg:p-16 absolute lg:absolute z-10 right-0"
-                            animate={{ 
-                                x: !isLogin ? '0%' : '100%',
-                                opacity: !isLogin ? 1 : 0,
-                                scale: !isLogin ? 1 : 0.98,
-                                filter: !isLogin ? 'blur(0px)' : 'blur(4px)'
-                            }}
-                            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-                        >
-                            <div className="w-full max-w-sm">
-                                <div className="mb-10">
-                                    <div className="flex items-center gap-2 mb-6">
-                                        <div className="px-3 py-1 bg-accent/10 border border-accent/20 rounded-full text-[10px] text-primary font-black uppercase tracking-widest">
-                                            Immediate Access
-                                        </div>
-                                    </div>
-                                    <h1 className="font-heading font-extrabold text-4xl text-primary mb-3">Get Started</h1>
-                                    <p className="text-slate-600 font-medium">Join 2,000+ businesses growing with Vitta.</p>
-                                </div>
-
-                                <form onSubmit={handleSignupSubmit} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Your Full Name</Label>
-                                        <Input
-                                            type="text"
-                                            required
-                                            value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            className="h-14 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
-                                            placeholder="John Doe"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Business Email</Label>
-                                        <Input
-                                            type="email"
-                                            required
-                                            value={formData.email}
-                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            className="h-14 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
-                                            placeholder="name@company.com"
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Password</Label>
-                                            <div className="relative">
-                                                <Input
-                                                    type={showPassword ? 'text' : 'password'}
-                                                    required
-                                                    value={formData.password}
-                                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                                    className="h-14 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
-                                                    placeholder="••••••••"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowPassword(!showPassword)}
-                                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                                                >
-                                                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Confirm</Label>
-                                            <div className="relative">
-                                                <Input
-                                                    type={showConfirmPassword ? 'text' : 'password'}
-                                                    required
-                                                    value={formData.confirmPassword}
-                                                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                                                    className="h-14 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
-                                                    placeholder="••••••••"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                                                >
-                                                    {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-center space-x-3 py-3">
-                                        <div className="mt-1">
-                                            <Checkbox
-                                                id="auth-terms-refined"
-                                                checked={agreedToTerms}
-                                                onCheckedChange={setAgreedToTerms}
-                                                className="rounded-md border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                            />
-                                        </div>
-                                        <label htmlFor="auth-terms-refined" className="text-[11px] text-slate-600 font-medium leading-relaxed">
-                                            I agree to the <a href="#" className="text-primary font-bold hover:underline">Terms of Service</a> and <a href="#" className="text-primary font-bold hover:underline">Privacy Policy</a>.
-                                        </label>
-                                    </div>
-
-                                    <div className="flex justify-center">
-                                        <Button
-                                            type="submit"
-                                            disabled={loading}
-                                            className="w-full h-14 rounded-lg bg-gradient-to-r from-primary to-[#16523E] hover:from-primary/95 hover:to-[#16523E]/95 text-white font-black uppercase tracking-widest shadow-[0_20px_40px_-12px_rgba(15,57,43,0.25)] transition-all hover:scale-[1.01] active:scale-[0.99] border-t border-white/10"
-                                        >
-                                            {loading ? 'Creating...' : 'Create Account'}
-                                        </Button>
-                                    </div>
-                                </form>
-
-                                <div className="mt-4 pt-4 border-t border-slate-100">
-                                    <p className="text-sm text-slate-600 font-medium text-center">
-                                        Have a member account?{' '}
-                                        <button 
-                                            onClick={handleToggle}
-                                            className="text-primary font-black hover:text-primary/70 transition-all ml-1"
-                                        >
-                                            Sign in here
-                                        </button>
-                                    </p>
-                                </div>
-                            </div>
-                        </motion.div>
-
+                      ))}
                     </div>
+                  </motion.div>
+                ) : (
+                  <motion.div key="signup-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.4 }} className="max-w-[220px]">
+                    <div className="w-10 h-[3px] bg-[#B2D71E] rounded-full mx-auto mb-7" />
+                    <h2 className="font-sora font-bold text-[30px] text-white mb-3 tracking-[-0.02em] leading-tight">Modern Finances.</h2>
+                    <p className="text-white/45 text-[13px] leading-relaxed mb-9">A faster, more intelligent way to handle your bank statements.</p>
+                    <div className="flex items-center justify-center gap-3 pt-7 border-t border-white/[0.08]">
+                      {[ShieldCheck, Zap, Globe, Lock].map((Icon, j) => (
+                        <div key={j} className="w-8 h-8 rounded-xl bg-white/[0.07] border border-white/[0.08] flex items-center justify-center">
+                          <Icon className="h-3.5 w-3.5 text-white/45" />
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+
+          {/* Form area */}
+          <div className="flex-1 flex overflow-hidden relative">
+
+            {/* Login form */}
+            <motion.div className="w-full lg:w-[58%] h-full flex items-center justify-center p-8 lg:p-12 absolute lg:relative z-10 bg-white"
+              animate={{ x: isLogin ? '0%' : '-105%', opacity: isLogin ? 1 : 0, filter: isLogin ? 'blur(0px)' : 'blur(5px)', scale: isLogin ? 1 : 0.97 }}
+              transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}>
+              <div className="w-full max-w-[300px]">
+                <div className="mb-8">
+                  <div className="inline-flex items-center gap-2 bg-[#0B2B1C]/5 border border-[#0B2B1C]/8 rounded-full px-3 py-1.5 mb-5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#B2D71E]" />
+                    <span className="text-[#0B2B1C] text-[9px] font-bold uppercase tracking-widest">Secure Login</span>
+                  </div>
+                  <h1 className="font-sora font-bold text-[28px] text-[#0B2B1C] mb-1.5 tracking-[-0.02em]">Welcome back.</h1>
+                  <p className="text-slate-400 text-[13px]">Access your financial headquarters.</p>
                 </div>
-            </main>
-            
-            <Footer />
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div><Label className={labelCls}>Email address</Label><Input type="email" required value={formData.email} onChange={e=>setFormData({...formData,email:e.target.value})} className={inputCls} placeholder="name@company.com" /></div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <Label className={labelCls} style={{marginBottom:0}}>Password</Label>
+                      <Link to="/forgot-password" className="text-[9px] text-slate-400 hover:text-[#0B2B1C] transition-colors font-medium">Forgot?</Link>
+                    </div>
+                    <div className="relative">
+                      <Input type={showPassword?'text':'password'} required value={formData.password} onChange={e=>setFormData({...formData,password:e.target.value})} className={inputCls} placeholder="••••••••" />
+                      <button type="button" onClick={()=>setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">{showPassword?<EyeOff className="h-4 w-4"/>:<Eye className="h-4 w-4"/>}</button>
+                    </div>
+                  </div>
+                  <Button type="submit" disabled={loading} className="w-full h-11 bg-[#0B2B1C] hover:bg-[#0B2B1C]/90 text-white rounded-xl font-semibold text-[13px] shadow-md shadow-[#0B2B1C]/15 transition-all gap-2 mt-1">
+                    {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>Signing in…</> : <>Sign in <ArrowRight className="h-4 w-4"/></>}
+                  </Button>
+                </form>
+                <p className="mt-6 pt-5 border-t border-slate-50 text-[13px] text-slate-400 text-center">
+                  New to Vitta?{' '}<button onClick={handleToggle} className="text-[#0B2B1C] font-semibold hover:opacity-70 transition-opacity">Create a free account</button>
+                </p>
+              </div>
+            </motion.div>
+
+            {/* Signup form */}
+            <motion.div className="w-full lg:w-[58%] h-full flex items-center justify-center p-8 lg:p-12 absolute lg:absolute z-10 right-0 bg-white"
+              animate={{ x: !isLogin ? '0%' : '105%', opacity: !isLogin ? 1 : 0, filter: !isLogin ? 'blur(0px)' : 'blur(5px)', scale: !isLogin ? 1 : 0.97 }}
+              transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}>
+              <div className="w-full max-w-[300px]">
+                <div className="mb-7">
+                  <div className="inline-flex items-center gap-2 bg-[#B2D71E]/15 border border-[#B2D71E]/20 rounded-full px-3 py-1.5 mb-5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#B2D71E]" />
+                    <span className="text-[#0B2B1C] text-[9px] font-bold uppercase tracking-widest">Free forever</span>
+                  </div>
+                  <h1 className="font-sora font-bold text-[28px] text-[#0B2B1C] mb-1.5 tracking-[-0.02em]">Get started.</h1>
+                  <p className="text-slate-400 text-[13px]">Join 2,000+ businesses growing with Vitta.</p>
+                </div>
+                <form onSubmit={handleSignup} className="space-y-3.5">
+                  <div><Label className={labelCls}>Full name</Label><Input type="text" required value={formData.name} onChange={e=>setFormData({...formData,name:e.target.value})} className={inputCls} placeholder="John Doe" /></div>
+                  <div><Label className={labelCls}>Business email</Label><Input type="email" required value={formData.email} onChange={e=>setFormData({...formData,email:e.target.value})} className={inputCls} placeholder="name@company.com" /></div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className={labelCls}>Password</Label>
+                      <div className="relative"><Input type={showPassword?'text':'password'} required value={formData.password} onChange={e=>setFormData({...formData,password:e.target.value})} className={inputCls} placeholder="••••••••" /><button type="button" onClick={()=>setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">{showPassword?<EyeOff className="h-3.5 w-3.5"/>:<Eye className="h-3.5 w-3.5"/>}</button></div>
+                    </div>
+                    <div>
+                      <Label className={labelCls}>Confirm</Label>
+                      <div className="relative"><Input type={showConfirm?'text':'password'} required value={formData.confirmPassword} onChange={e=>setFormData({...formData,confirmPassword:e.target.value})} className={inputCls} placeholder="••••••••" /><button type="button" onClick={()=>setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">{showConfirm?<EyeOff className="h-3.5 w-3.5"/>:<Eye className="h-3.5 w-3.5"/>}</button></div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 py-1">
+                    <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={setAgreedToTerms} className="mt-0.5 rounded border-slate-300 data-[state=checked]:bg-[#0B2B1C] data-[state=checked]:border-[#0B2B1C]" />
+                    <label htmlFor="terms" className="text-[11px] text-slate-400 leading-relaxed cursor-pointer">
+                      I agree to the <a href="#" className="text-[#0B2B1C] hover:underline font-semibold">Terms</a> and <a href="#" className="text-[#0B2B1C] hover:underline font-semibold">Privacy Policy</a>
+                    </label>
+                  </div>
+                  <Button type="submit" disabled={loading} className="w-full h-11 bg-[#0B2B1C] hover:bg-[#0B2B1C]/90 text-white rounded-xl font-semibold text-[13px] shadow-md shadow-[#0B2B1C]/15 gap-2 transition-all">
+                    {loading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>Creating…</> : <>Create account <ArrowRight className="h-4 w-4"/></>}
+                  </Button>
+                </form>
+                <p className="mt-5 pt-5 border-t border-slate-50 text-[13px] text-slate-400 text-center">
+                  Already have an account?{' '}<button onClick={handleToggle} className="text-[#0B2B1C] font-semibold hover:opacity-70 transition-opacity">Sign in here</button>
+                </p>
+              </div>
+            </motion.div>
+          </div>
         </div>
-    );
+      </main>
+      <Footer />
+    </div>
+  );
 };
 
 export default AuthPage;

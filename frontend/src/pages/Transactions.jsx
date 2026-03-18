@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ConfirmPopup from '../components/ConfirmPopup';
+import { DateRangePicker } from '../components/ui/date-range-picker';
 
 /* ─────────────────────────────────────────────
    Inline global font import (DM Sans)
@@ -119,8 +120,7 @@ const Transactions = () => {
   const [filterAccount, setFilterAccount] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
+  const [dateRange, setDateRange] = useState({ from: undefined, to: undefined });
   const [sortOrder, setSortOrder] = useState('desc');
 
   const [editingTransaction, setEditingTransaction] = useState(null);
@@ -201,12 +201,22 @@ const Transactions = () => {
                             (filterType === 'credit' && (txn.type === 'credit' || txn.type === 'opening'));
     const matchesCategory = filterCategory === 'all' || txn.category_id === filterCategory;
     const txnDate  = parseDate(txn.date);
-    const fromDate = filterDateFrom ? new Date(filterDateFrom) : null;
-    const toDate   = filterDateTo   ? new Date(filterDateTo)   : null;
-    if (fromDate) fromDate.setHours(0,0,0,0);
-    if (toDate)   toDate.setHours(23,59,59,999);
-    return matchesSearch && matchesAccount && matchesType && matchesCategory &&
-           (!fromDate || txnDate >= fromDate) && (!toDate || txnDate <= toDate);
+    const fromDate = dateRange?.from;
+    const toDate   = dateRange?.to;
+    
+    let isWithinDateRange = true;
+    if (fromDate) {
+      const dFrom = new Date(fromDate);
+      dFrom.setHours(0,0,0,0);
+      isWithinDateRange = isWithinDateRange && txnDate >= dFrom;
+    }
+    if (toDate) {
+      const dTo = new Date(toDate);
+      dTo.setHours(23,59,59,999);
+      isWithinDateRange = isWithinDateRange && txnDate <= dTo;
+    }
+    
+    return matchesSearch && matchesAccount && matchesType && matchesCategory && isWithinDateRange;
   });
 
   const transactionsWithBalance = [...filteredTransactions]
@@ -229,36 +239,93 @@ const Transactions = () => {
   const totalOutflow = transactionsWithBalance.reduce((s,t) => (t.type==='debit' ? s+t.amount : s), 0);
   const netBalance   = totalInflow - totalOutflow;
   const currentAccount = accounts.find(a => a.id === filterAccount);
-  const hasFilters = searchTerm || filterAccount !== 'all' || filterType !== 'all' || filterDateFrom || filterDateTo;
+  const hasFilters = searchTerm || filterAccount !== 'all' || filterType !== 'all' || dateRange?.from || dateRange?.to;
 
   /* ── PDF Export ── */
   const exportPDF = () => {
     const doc = new jsPDF();
-    const title = filterAccount === 'all' ? 'All Accounts' : getAccountName(filterAccount);
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(14);
-    doc.text(`${title} — Transaction Statement`, 14, 16);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 14;
+
+    // Header branding
+    doc.setFillColor(15, 23, 42); // bg-slate-900 equivalent
+    doc.rect(0, 0, pageWidth, 40, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('VITTA', margin, 18);
+
     doc.setFontSize(9);
-    doc.setFont('helvetica','normal');
-    doc.setTextColor(100);
-    doc.text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, 14, 23);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(200, 200, 200);
+    doc.text('Business Finance & Ledger Manager', margin, 24);
+
+    // Document Title
+    const title = filterAccount === 'all' ? 'All Accounts' : getAccountName(filterAccount);
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Statement: ${title}`, margin, 34);
+
+    // Summary Box
+    let currentY = 50;
+    doc.setFillColor(248, 250, 252); // bg-slate-50
+    doc.roundedRect(margin, currentY, pageWidth - (margin * 2), 22, 2, 2, 'F');
+
+    doc.setTextColor(100, 116, 139); // text-slate-400
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOTAL INFLOW', margin + 10, currentY + 8);
+    doc.text('TOTAL OUTFLOW', margin + 60, currentY + 8);
+    doc.text('NET BALANCE', margin + 110, currentY + 8);
+    doc.text('GENERATED ON', margin + 150, currentY + 8);
+
+    doc.setTextColor(15, 23, 42); // text-slate-900
+    doc.setFontSize(11);
+    doc.text(`Rs. ${totalInflow.toLocaleString('en-IN')}`, margin + 10, currentY + 16);
+    doc.setTextColor(225, 29, 72); // rose-600
+    doc.text(`Rs. ${totalOutflow.toLocaleString('en-IN')}`, margin + 60, currentY + 16);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Rs. ${netBalance.toLocaleString('en-IN')}`, margin + 110, currentY + 16);
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(9);
+    doc.text(`${new Date().toLocaleDateString('en-IN')}`, margin + 150, currentY + 16);
+
     autoTable(doc, {
-      startY: 28,
-      styles: { fontSize: 8, font: 'helvetica' },
-      headStyles: { fillColor: [15,23,42], textColor: 255, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [248,250,252] },
-      head: [['Date','Particulars','Ledger','Ref','Debit','Credit','Balance']],
+      startY: currentY + 30,
+      styles: { fontSize: 8, font: 'helvetica', cellPadding: 3 },
+      headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { cellWidth: 22 }, // Date
+        1: { cellWidth: 60 }, // Particulars
+        2: { cellWidth: 25 }, // Ledger
+        3: { cellWidth: 25 }, // Ref
+        4: { cellWidth: 15 }, // Debit
+        5: { cellWidth: 15 }, // Credit
+        6: { cellWidth: 20 }, // Balance
+      },
+      head: [['Date', 'Particulars', 'Ledger', 'Ref / Chq', 'Debit', 'Credit', 'Balance']],
       body: displayTransactions.map(t => [
         formatDisplayDate(t.date),
         t.description,
-        t.ledger_name || '',
-        t.reference_number || t.cheque_number || '',
-        t.type === 'debit' ? `₹${t.amount?.toLocaleString('en-IN')}` : '',
-        (t.type==='credit'||t.type==='opening') ? `₹${t.amount?.toLocaleString('en-IN')}` : '',
-        `₹${t.runningBalance?.toLocaleString('en-IN')}`,
+        t.ledger_name || '-',
+        t.reference_number || t.cheque_number || '-',
+        t.type === 'debit' ? `${t.amount?.toLocaleString('en-IN')}` : '',
+        (t.type === 'credit' || t.type === 'opening') ? `${t.amount?.toLocaleString('en-IN')}` : '',
+        `${t.runningBalance?.toLocaleString('en-IN')}`,
       ]),
+      didDrawPage: (data) => {
+        // Footer
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.setTextColor(160);
+        doc.text(`Page ${pageCount}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+      }
     });
-    doc.save('transactions.pdf');
+
+    doc.save(`statement_${title.toLowerCase().replace(/ /g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
   /* ────────────────── RENDER ────────────────── */
@@ -313,30 +380,19 @@ const Transactions = () => {
               <SelectItem value="debit"  className="text-[13px] text-rose-500 font-medium">Debit</SelectItem>
             </FilterSelect>
 
-            {/* Date range */}
-            <div className="flex items-center gap-1.5 h-9 bg-slate-50 border border-slate-200 rounded-lg px-3">
-              <Calendar className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-              <input
-                type="date"
-                value={filterDateFrom}
-                onChange={e => setFilterDateFrom(e.target.value)}
-                className="bg-transparent border-none outline-none text-[12px] font-medium text-slate-600 w-28"
-              />
-              <span className="text-slate-300 text-sm">–</span>
-              <input
-                type="date"
-                value={filterDateTo}
-                onChange={e => setFilterDateTo(e.target.value)}
-                className="bg-transparent border-none outline-none text-[12px] font-medium text-slate-600 w-28"
-              />
-            </div>
+            {/* Date range picker */}
+            <DateRangePicker 
+              date={dateRange} 
+              setDate={setDateRange} 
+              placeholder="Select Date"
+            />
 
             {hasFilters && (
               <button
                 onClick={() => {
                   setFilterAccount('all'); setFilterType('all');
-                  setFilterCategory('all'); setFilterDateFrom('');
-                  setFilterDateTo(''); setSearchTerm('');
+                  setFilterCategory('all'); setDateRange({ from: undefined, to: undefined });
+                  setSearchTerm('');
                 }}
                 className="text-[12px] font-medium text-rose-500 hover:text-rose-600 px-2 py-1 rounded hover:bg-rose-50 transition-colors"
               >
@@ -391,10 +447,10 @@ const Transactions = () => {
               <TooltipTrigger asChild>
                 <Button
                   onClick={() => navigate('/import')}
-                  className="h-9 w-9 rounded-lg bg-slate-900 text-white hover:bg-slate-800 shadow-sm"
                   size="icon"
+                  className="h-9 w-9 rounded-lg bg-slate-900 text-white hover:bg-slate-800 shadow-sm flex items-center justify-center transition-all active:scale-95"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-4.5 w-4.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent className="text-[11px] font-medium">Add Transaction</TooltipContent>
@@ -524,7 +580,7 @@ const Transactions = () => {
                                   <TooltipTrigger asChild>
                                     <button
                                       onClick={() => { setEditingTransaction(txn); setEditCategory(txn.category_id || ''); }}
-                                      className="h-7 w-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors opacity-0 group-hover:opacity-100"
+                                      className="h-7 w-7 flex items-center justify-center rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                                     >
                                       <Edit className="h-3.5 w-3.5" />
                                     </button>
@@ -535,7 +591,7 @@ const Transactions = () => {
                                   <TooltipTrigger asChild>
                                     <button
                                       onClick={() => { setTransactionToDelete(txn.id); setDeleteConfirmOpen(true); }}
-                                      className="h-7 w-7 flex items-center justify-center rounded-md text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100"
+                                      className="h-7 w-7 flex items-center justify-center rounded-md text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </button>
