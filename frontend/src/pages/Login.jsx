@@ -50,7 +50,7 @@ const Login = () => {
             transition={{ duration: 0.5 }}
             className="w-full max-w-md"
           >
-            <div className="bg-white rounded-3xl border border-slate-200 p-10 shadow-2xl shadow-slate-200/50">
+            <div className="bg-white rounded-lg border border-slate-200 p-10 shadow-2xl shadow-slate-200/50">
               <div className="mb-10 text-center lg:text-left">
                 <h1 className="font-heading font-extrabold text-4xl text-primary mb-3">Welcome Back</h1>
                 <p className="text-slate-500 font-medium">Simplify your business finances today.</p>
@@ -67,7 +67,7 @@ const Login = () => {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     autoComplete="email"
-                    className="h-14 rounded-2xl bg-slate-50 border-slate-100 focus:bg-white transition-all px-6"
+                    className="h-14 rounded-lg bg-slate-50 border-slate-100 focus:bg-white transition-all px-6"
                     placeholder="name@company.com"
                   />
                 </div>
@@ -88,7 +88,7 @@ const Login = () => {
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       autoComplete="current-password"
-                      className="h-14 rounded-2xl bg-slate-50 border-slate-100 focus:bg-white transition-all px-6"
+                      className="h-14 rounded-lg bg-slate-50 border-slate-100 focus:bg-white transition-all px-6"
                       placeholder="••••••••"
                     />
                     <button
@@ -105,7 +105,7 @@ const Login = () => {
                   data-testid="login-submit-button"
                   type="submit"
                   disabled={loading}
-                  className="w-full h-14 rounded-2xl bg-primary hover:bg-primary/95 text-white font-black uppercase tracking-widest shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  className="w-full h-14 rounded-lg bg-primary hover:bg-primary/95 text-white font-black uppercase tracking-widest shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                 >
                   {loading ? 'Authenticating...' : 'Sign In'}
                 </Button>

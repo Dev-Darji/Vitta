@@ -1,37 +1,92 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  TrendingUp, TrendingDown, Wallet, ArrowUpRight, Upload, 
-  PlusCircle, LayoutDashboard, CreditCard, Users, History,
-  ArrowRight, Globe, Sparkles, Building2, ChevronRight,
+import {
+  TrendingUp, TrendingDown, Wallet, ArrowUpRight,
+  PlusCircle, LayoutDashboard, CreditCard, History,
+  ArrowRight, Building2, ChevronRight,
   PieChart as PieIcon, BarChart3, Receipt,
-  PenLine,
-  FileSpreadsheet
+  PenLine, FileSpreadsheet, Loader2, Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, BarChart, Bar 
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, BarChart, Bar,
+  PieChart, Pie, Cell
 } from 'recharts';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 
+/* ─── Font ─────────────────────────────────────────────────────────────── */
+const FontStyle = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+    [data-dashboard] { font-family: 'DM Sans', sans-serif; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    [data-dashboard] .anim { animation: fadeUp 0.28s ease both; }
+    [data-dashboard] .anim-1 { animation-delay: 0.04s }
+    [data-dashboard] .anim-2 { animation-delay: 0.08s }
+    [data-dashboard] .anim-3 { animation-delay: 0.12s }
+    [data-dashboard] .anim-4 { animation-delay: 0.16s }
+    [data-dashboard] .anim-5 { animation-delay: 0.20s }
+    [data-dashboard] .anim-6 { animation-delay: 0.24s }
+  `}</style>
+);
+
+/* ─── Palette ───────────────────────────────────────────────────────────── */
+const INCOME_COLOR  = '#10b981';
+const EXPENSE_COLOR = '#f43f5e';
+const PIE_PALETTE   = ['#6366f1','#10b981','#f59e0b','#f43f5e','#3b82f6','#8b5cf6'];
+
+/* ─── Chart Tooltip ─────────────────────────────────────────────────────── */
+const ChartTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white border border-slate-100 shadow-xl rounded-xl px-4 py-3 min-w-[160px]">
+      {label && <p className="text-[11px] font-semibold text-slate-400 mb-2 uppercase tracking-wider">{label}</p>}
+      {payload.map((item, i) => (
+        <div key={i} className="flex items-center justify-between gap-5 mb-1 last:mb-0">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+            <span className="text-[12px] font-medium text-slate-600">{item.name}</span>
+          </div>
+          <span className="text-[12px] font-bold text-slate-900">₹{Number(item.value).toLocaleString('en-IN')}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/* ─── Section Header ────────────────────────────────────────────────────── */
+const SectionHeader = ({ icon: Icon, iconBg, iconColor, title, subtitle, action }) => (
+  <div className="flex items-center justify-between mb-5">
+    <div className="flex items-center gap-3">
+      <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${iconBg}`}>
+        <Icon className={`h-4 w-4 ${iconColor}`} />
+      </div>
+      <div>
+        <p className="text-[13.5px] font-semibold text-slate-900 leading-tight">{title}</p>
+        {subtitle && <p className="text-[11px] text-slate-400 mt-0">{subtitle}</p>}
+      </div>
+    </div>
+    {action}
+  </div>
+);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════════════════════════════════════════ */
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [summary, setSummary] = useState({
-    total_income: 0,
-    total_expense: 0,
-    net_balance: 0,
-    transaction_count: 0,
-  });
+  const [summary, setSummary] = useState({ total_income: 0, total_expense: 0, net_balance: 0, transaction_count: 0 });
   const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  useEffect(() => { fetchDashboardData(); }, []);
 
   const fetchDashboardData = async () => {
     try {
@@ -40,311 +95,315 @@ const Dashboard = () => {
         api.get('/reports/monthly-trend'),
         api.get('/accounts'),
       ]);
-      
       setSummary(summaryRes.data);
       setMonthlyTrend(trendRes.data);
       setAccounts(accountsRes.data);
-    } catch (error) {
-      toast.error('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
+    } catch { toast.error('Failed to load dashboard data'); }
+    finally { setLoading(false); }
   };
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full space-y-4">
-        <motion.div 
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full"
-        />
-        <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">Preparing Intelligence...</p>
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-3">
+        <Loader2 className="h-7 w-7 text-primary/30 animate-spin" />
+        <p className="text-[12px] font-medium text-slate-400">Loading dashboard…</p>
       </div>
     );
   }
 
+  const totalPortfolio = accounts.reduce((s, a) => s + (a.balance || 0), 0);
+
   const stats = [
-    {
-      label: 'Gross Revenue',
-      value: `₹${summary.total_income.toLocaleString('en-IN')}`,
-      icon: TrendingUp,
-      color: 'green',
-      trend: '+12.5%',
-      gradient: 'from-emerald-500/10 to-teal-500/10',
-      iconBg: 'bg-emerald-50 text-emerald-600'
-    },
-    {
-      label: 'Business Expenses',
-      value: `₹${summary.total_expense.toLocaleString('en-IN')}`,
-      icon: TrendingDown,
-      color: 'red',
-      trend: '+4.2%',
-      gradient: 'from-rose-500/10 to-orange-500/10',
-      iconBg: 'bg-rose-50 text-rose-600'
-    },
-    {
-      label: 'Net Positioning',
-      value: `₹${summary.net_balance.toLocaleString('en-IN')}`,
-      icon: Wallet,
-      color: 'blue',
-      trend: 'Optimized',
-      gradient: 'from-blue-500/10 to-indigo-500/10',
-      iconBg: 'bg-blue-50 text-blue-600'
-    },
-    {
-      label: 'Ledger Records',
-      value: summary.transaction_count,
-      icon: History,
-      color: 'primary',
-      trend: 'Live',
-      gradient: 'from-primary/10 to-accent/10',
-      iconBg: 'bg-primary/10 text-primary'
-    }
+    { label: 'Total Income',   value: summary.total_income,   icon: TrendingUp,   badge: 'Income',  badgeColor: 'bg-emerald-50 text-emerald-600', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600' },
+    { label: 'Total Expense',  value: summary.total_expense,  icon: TrendingDown,  badge: 'Expense', badgeColor: 'bg-rose-50 text-rose-500',      iconBg: 'bg-rose-50',    iconColor: 'text-rose-500' },
+    { label: 'Net Balance',    value: summary.net_balance,    icon: Wallet,        badge: summary.net_balance >= 0 ? 'Profit' : 'Deficit', badgeColor: summary.net_balance >= 0 ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-500', iconBg: 'bg-indigo-50', iconColor: 'text-indigo-600' },
+    { label: 'Transactions',   value: summary.transaction_count ?? 0, icon: Receipt, badge: 'All time', badgeColor: 'bg-amber-50 text-amber-600', iconBg: 'bg-amber-50', iconColor: 'text-amber-600', isCount: true },
+  ];
+
+  /* sample pie data for morphology — replace with real category data if available */
+  const morphologyData = [
+    { name: 'Operations',    value: 45000 },
+    { name: 'Infrastructure',value: 32000 },
+    { name: 'Human Capital', value: 28000 },
+    { name: 'Marketing',     value: 15000 },
+    { name: 'Misc',          value: 5000 },
   ];
 
   return (
-    <div className="space-y-10 pb-12">
-      {/* Welcome Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-2">
+    <div data-dashboard className="space-y-6 pb-24">
+      <FontStyle />
+
+      {/* ── Page Header ── */}
+      <div className="anim anim-1 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">System Online</span>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-[3px] h-5 bg-slate-800 rounded-full" />
+            <h1 className="text-[22px] font-bold tracking-tight text-slate-900 leading-none">Dashboard</h1>
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-            Financial Briefroom <Sparkles className="h-6 w-6 text-accent fill-accent" />
-          </h1>
-          <p className="text-slate-500 font-medium text-lg mt-1">Real-time intelligence for your business architecture.</p>
+          <p className="text-[12px] text-slate-400 font-medium ml-[18px]">Financial overview across all accounts.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block mr-2">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Balance</p>
-            <p className="text-xl font-black text-slate-900 leading-none">
-              ₹{accounts.reduce((sum, acc) => sum + acc.balance, 0).toLocaleString('en-IN')}
+
+        {/* Portfolio pill */}
+        <div className="flex items-center gap-4 bg-white pl-5 pr-2 py-2 rounded-xl border border-slate-100 shadow-sm">
+          <div>
+            <p className="text-[9.5px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Portfolio Value</p>
+            <p className="text-[18px] font-bold text-slate-900 leading-tight">
+              <span className="text-[13px] font-medium text-slate-400 mr-0.5">₹</span>
+              {totalPortfolio.toLocaleString('en-IN')}
             </p>
           </div>
-          <Button onClick={() => navigate('/transactions')} variant="outline" className="rounded-2xl h-14 px-6 border-slate-200 font-bold hover:bg-slate-50 transition-all border-2">
-            Full Ledger <ArrowRight className="ml-2 h-4 w-4" />
+          <Button onClick={() => navigate('/transactions')} className="bg-slate-900 hover:bg-black text-white h-9 px-5 rounded-lg text-[13px] font-semibold shadow-sm">
+            View Ledger
           </Button>
         </div>
       </div>
 
-      {/* Modern Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* ── KPI Cards ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1, duration: 0.6 }}
-            className={`relative group bg-white rounded-[32px] p-8 border-2 border-slate-50 hover:border-primary/20 transition-all duration-500 shadow-sm hover:shadow-2xl overflow-hidden`}
-          >
-            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${stat.gradient} rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-2xl`} />
-            <div className="relative z-10">
-              <div className="flex justify-between items-start mb-6">
-                <div className={`p-4 ${stat.iconBg} rounded-2xl shadow-sm group-hover:scale-110 transition-transform duration-500`}>
-                  <stat.icon className="h-6 w-6" />
-                </div>
-                <span className="text-[10px] font-black tracking-widest text-slate-400 px-3 py-1 bg-slate-50 rounded-full">{stat.trend}</span>
+          <div key={i} className={`anim anim-${i + 2} bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-5 hover:shadow-md hover:border-slate-200 transition-all`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${stat.iconBg}`}>
+                <stat.icon className={`h-4 w-4 ${stat.iconColor}`} />
               </div>
-              <p className="text-sm font-bold text-slate-500 mb-1">{stat.label}</p>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">{stat.value}</h3>
+              <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md ${stat.badgeColor}`}>
+                {stat.badge}
+              </span>
             </div>
-          </motion.div>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">{stat.label}</p>
+            {stat.isCount ? (
+              <p className="text-[22px] font-bold text-slate-900 leading-tight">{Number(stat.value).toLocaleString('en-IN')}</p>
+            ) : (
+              <p className="text-[22px] font-bold text-slate-900 leading-tight">
+                <span className="text-[14px] font-medium text-slate-400 mr-0.5">₹</span>
+                {Number(stat.value).toLocaleString('en-IN')}
+              </p>
+            )}
+          </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Trend Visualization */}
-        <motion.div
-          initial={{ opacity: 0, x: -30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-          className="lg:col-span-8 bg-white rounded-[40px] p-10 border-2 border-slate-50 shadow-sm relative overflow-hidden"
-        >
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
-            <div>
-              <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                Revenue vs Expense Curve
-              </h3>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mt-1">Monthly Financial Projection</p>
+      {/* ── Main Content Grid ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
+
+        {/* ── Left: Charts ── */}
+        <div className="xl:col-span-8 space-y-5">
+
+          {/* Area Chart */}
+          <div className="anim anim-3 bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+            <SectionHeader
+              icon={BarChart3} iconBg="bg-indigo-50" iconColor="text-indigo-500"
+              title="Monthly Cash Flow" subtitle="Income vs Expense over time"
+              action={
+                <div className="flex items-center gap-4 px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-0.5 bg-emerald-500 rounded" />
+                    <span className="text-[11px] font-medium text-slate-500">Income</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-0.5 bg-rose-500 rounded" />
+                    <span className="text-[11px] font-medium text-slate-500">Expense</span>
+                  </div>
+                </div>
+              }
+            />
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={monthlyTrend} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="dIncome" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor={INCOME_COLOR}  stopOpacity={0.12} />
+                      <stop offset="95%" stopColor={INCOME_COLOR}  stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="dExpense" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor={EXPENSE_COLOR} stopOpacity={0.10} />
+                      <stop offset="95%" stopColor={EXPENSE_COLOR} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} dy={8}
+                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500, fontFamily: 'DM Sans' }} />
+                  <YAxis axisLine={false} tickLine={false} width={52}
+                    tickFormatter={v => `₹${v >= 1000 ? (v/1000).toFixed(0)+'k' : v}`}
+                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500, fontFamily: 'DM Sans' }} />
+                  <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#e2e8f0', strokeWidth: 1 }} />
+                  <Area type="monotone" name="Income"  dataKey="income"  stroke={INCOME_COLOR}  strokeWidth={2.5} fill="url(#dIncome)"  dot={false} activeDot={{ r: 4, fill: INCOME_COLOR,  strokeWidth: 0 }} />
+                  <Area type="monotone" name="Expense" dataKey="expense" stroke={EXPENSE_COLOR} strokeWidth={2.5} fill="url(#dExpense)" dot={false} activeDot={{ r: 4, fill: EXPENSE_COLOR, strokeWidth: 0 }} />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
-            <div className="flex items-center gap-6 p-2 bg-slate-50 rounded-2xl border border-slate-100">
-              <div className="flex items-center gap-2 px-3">
-                <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                <span className="text-[10px] font-black text-slate-500 uppercase">Input</span>
+          </div>
+
+          {/* Bar + Pie row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+            {/* Bar chart */}
+            <div className="anim anim-4 bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+              <SectionHeader
+                icon={BarChart3} iconBg="bg-slate-100" iconColor="text-slate-600"
+                title="Last 6 Months" subtitle="Income vs Expense"
+              />
+              <div className="h-[190px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyTrend.slice(-6)} barCategoryGap="30%" barGap={3} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} dy={6}
+                      tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500, fontFamily: 'DM Sans' }} />
+                    <YAxis axisLine={false} tickLine={false} width={44}
+                      tickFormatter={v => `₹${v >= 1000 ? (v/1000).toFixed(0)+'k' : v}`}
+                      tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500, fontFamily: 'DM Sans' }} />
+                    <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f8fafc' }} />
+                    <Bar name="Income"  dataKey="income"  fill={INCOME_COLOR}  radius={[4,4,0,0]} maxBarSize={22} />
+                    <Bar name="Expense" dataKey="expense" fill={EXPENSE_COLOR} radius={[4,4,0,0]} maxBarSize={22} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-              <div className="flex items-center gap-2 px-3 border-l border-slate-200">
-                <div className="h-3 w-3 rounded-full bg-rose-500" />
-                <span className="text-[10px] font-black text-slate-500 uppercase">Burn</span>
+            </div>
+
+            {/* Pie chart */}
+            <div className="anim anim-4 bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+              <SectionHeader
+                icon={PieIcon} iconBg="bg-amber-50" iconColor="text-amber-500"
+                title="Expense Mix" subtitle="Category breakdown"
+              />
+              <div className="flex items-center gap-4">
+                <div className="h-[190px] flex-shrink-0" style={{ width: '140px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={morphologyData} cx="50%" cy="50%" innerRadius={42} outerRadius={62} paddingAngle={3} dataKey="value" strokeWidth={0}>
+                        {morphologyData.map((_, i) => (
+                          <Cell key={i} fill={PIE_PALETTE[i % PIE_PALETTE.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<ChartTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex-1 space-y-2.5">
+                  {morphologyData.map((item, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_PALETTE[i % PIE_PALETTE.length] }} />
+                        <span className="text-[11.5px] font-medium text-slate-600 truncate">{item.name}</span>
+                      </div>
+                      <span className="text-[11.5px] font-semibold text-slate-800 flex-shrink-0">₹{item.value.toLocaleString('en-IN')}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-          
-          <div className="h-[350px] w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="month" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }}
-                  dy={15}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 700 }}
-                  dx={-10}
-                  tickFormatter={(val) => `₹${val/1000}k`}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    borderRadius: '24px', 
-                    border: 'none', 
-                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.1)',
-                    padding: '20px'
-                  }} 
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="income" 
-                  stroke="#10b981" 
-                  strokeWidth={4}
-                  fillOpacity={1} 
-                  fill="url(#colorIncome)" 
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="expense" 
-                  stroke="#ef4444" 
-                  strokeWidth={4}
-                  fillOpacity={1} 
-                  fill="url(#colorExpense)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
+        </div>
 
-        {/* Banking Integration Panel */}
-        <motion.div
-          initial={{ opacity: 0, x: 30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, delay: 0.5 }}
-          className="lg:col-span-4 flex flex-col gap-6"
-        >
-          <div className="bg-slate-900 text-white rounded-[40px] p-8 shadow-2xl relative overflow-hidden flex-1">
-             <Globe className="absolute -top-10 -right-10 h-40 w-40 text-white/5" />
-             <div className="relative z-10 flex flex-col h-full">
-               <div className="mb-6">
-                 <p className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-2">Connected Entities</p>
-                 <h3 className="text-2xl font-black tracking-tight leading-tight italic">Portfolio Velocity</h3>
-               </div>
-               
-               <div className="flex-1 space-y-4">
-                 {accounts.slice(0, 4).map((acc, i) => (
-                   <div key={acc.id} className="group p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 transition-all cursor-pointer">
-                     <div className="flex justify-between items-center">
-                       <div className="flex items-center gap-3">
-                         <div className="h-10 w-10 bg-white/10 rounded-xl flex items-center justify-center">
-                            <Building2 className="h-5 w-5 text-primary" />
-                         </div>
-                         <div>
-                           <p className="text-sm font-bold text-white leading-none mb-1">{acc.account_name}</p>
-                           <p className="text-[10px] font-bold text-white/40 uppercase tracking-tighter">{acc.bank_name}</p>
-                         </div>
-                       </div>
-                       <ChevronRight className="h-4 w-4 text-white/20 group-hover:text-primary transition-colors" />
-                     </div>
-                   </div>
-                 ))}
-                 
-                 {accounts.length === 0 && (
-                   <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-white/5 rounded-[32px] border border-dashed border-white/10">
-                     <p className="text-white/40 text-sm font-medium mb-6">No accounts detected in the current cloud.</p>
-                     <Button onClick={() => navigate('/accounts')} className="bg-primary hover:bg-primary/90 text-white font-black rounded-xl">Initialize First Account</Button>
-                   </div>
-                 )}
-               </div>
+        {/* ── Right: Sidebar ── */}
+        <div className="xl:col-span-4 space-y-5">
 
-               <Button 
+          {/* Accounts panel */}
+          <div className="anim anim-4 bg-slate-900 rounded-xl p-5 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-[60px] -mr-16 -mt-16 pointer-events-none" />
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <p className="text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-0.5">Connected Accounts</p>
+                  <p className="text-[16px] font-bold text-white leading-tight">Bank Ledgers</p>
+                </div>
+                <div className="h-8 w-8 bg-white/8 rounded-lg border border-white/10 flex items-center justify-center">
+                  <Building2 className="h-4 w-4 text-white/50" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {accounts.length > 0 ? accounts.slice(0, 5).map((acc) => (
+                  <div
+                    key={acc.id}
+                    onClick={() => navigate('/accounts')}
+                    className="flex items-center justify-between px-3 py-2.5 bg-white/6 hover:bg-white/10 rounded-lg border border-white/[0.06] cursor-pointer transition-colors group"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="h-7 w-7 bg-white/10 rounded-md flex items-center justify-center flex-shrink-0 group-hover:bg-primary/80 transition-colors">
+                        <Building2 className="h-3.5 w-3.5 text-white/60 group-hover:text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[12.5px] font-semibold text-white leading-tight truncate">{acc.account_name}</p>
+                        <p className="text-[10px] text-white/30 font-medium">{acc.bank_name || '—'}</p>
+                      </div>
+                    </div>
+                    <p className="text-[12.5px] font-bold text-white flex-shrink-0 ml-2">
+                      ₹{(acc.balance || 0).toLocaleString('en-IN')}
+                    </p>
+                  </div>
+                )) : (
+                  <div className="py-8 text-center border border-dashed border-white/10 rounded-lg">
+                    <p className="text-[12px] font-medium text-white/30">No accounts yet</p>
+                  </div>
+                )}
+              </div>
+
+              <Button
                 onClick={() => navigate('/accounts')}
-                variant="ghost" 
-                className="mt-6 w-full h-14 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest text-[11px] border-none"
-               >
-                 View All Assets
-               </Button>
-             </div>
+                className="mt-5 w-full h-9 rounded-lg bg-white text-slate-900 hover:bg-slate-100 text-[13px] font-semibold shadow-sm transition-all"
+              >
+                View All Accounts
+              </Button>
+            </div>
           </div>
-          
-          <div className="bg-primary text-white p-8 rounded-[40px] relative overflow-hidden group">
-            <Sparkles className="absolute bottom-4 right-4 h-20 w-20 text-white/10 rotate-12 group-hover:scale-125 transition-transform duration-700" />
-            <h4 className="text-lg font-black tracking-tight mb-2">Growth Analytics</h4>
-            <p className="text-white/70 text-sm font-medium leading-relaxed mb-6">Automated insights are available for your monthly closing report.</p>
-            <Button onClick={() => navigate('/reports')} className="bg-white text-primary hover:bg-white/90 font-black rounded-xl h-12 shadow-2xl">
-              Access Intelligence
+
+          {/* Reports CTA */}
+          <div
+            className="anim anim-5 bg-emerald-500 text-white p-5 rounded-xl relative overflow-hidden cursor-pointer hover:bg-emerald-600 transition-colors group"
+            onClick={() => navigate('/reports')}
+          >
+            <Receipt className="absolute bottom-4 right-4 h-12 w-12 text-white/15 -rotate-12 group-hover:scale-110 transition-transform duration-300" />
+            <p className="text-[10px] font-semibold text-white/60 uppercase tracking-wider mb-1">Analytics</p>
+            <h4 className="text-[16px] font-bold text-white mb-1 leading-tight">Financial Reports</h4>
+            <p className="text-[12px] text-white/70 font-medium mb-4 leading-relaxed max-w-[200px]">
+              View income trends, expense breakdowns and export statements.
+            </p>
+            <Button onClick={(e) => { e.stopPropagation(); navigate('/reports'); }}
+              className="bg-slate-900 text-white hover:bg-black text-[12.5px] font-semibold px-5 h-8 rounded-lg shadow-sm">
+              Open Reports
             </Button>
           </div>
-        </motion.div>
+        </div>
       </div>
 
-      {/* Audit Log / Recent Action Preview */}
-      <div className="bg-white rounded-[40px] border-2 border-slate-50 p-10 shadow-sm">
-          <div className="flex justify-between items-center mb-10">
-            <div>
-              <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <History className="h-5 w-5 text-primary" />
-                Recent Control Actions
-              </h3>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mt-1">Direct from the Vitta Ledger Engine</p>
+      {/* ── Quick Actions ── */}
+      <div className="anim anim-6 bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <LayoutDashboard className="h-4 w-4 text-slate-400" />
+              <p className="text-[14px] font-semibold text-slate-900">Add Transactions</p>
             </div>
-            <Button onClick={() => navigate('/import')} className="bg-slate-900 hover:bg-black text-white rounded-2xl h-12 px-6 font-bold shadow-xl shadow-slate-200">
-               Post New Entry
-            </Button>
+            <p className="text-[12px] text-slate-400 ml-6">Choose how you want to enter data.</p>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-10 bg-slate-50/50 rounded-[32px] border border-slate-100 flex flex-col items-center text-center group hover:bg-white hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500">
-               <div className="h-16 w-16 bg-blue-100/50 text-blue-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-                  <PenLine className="h-8 w-8" />
-               </div>
-               <h4 className="text-lg font-black text-slate-900 mb-2">Instant Record</h4>
-               <p className="text-slate-500 text-sm font-medium mb-6 leading-relaxed">Manually authorize a single transaction in seconds.</p>
-               <Button onClick={() => navigate('/import', { state: { activeTab: 'manual' } })} variant="outline" className="rounded-xl font-bold h-10 border-slate-200">Execute</Button>
-            </div>
+          <Button onClick={() => navigate('/import')} className="bg-slate-900 hover:bg-black text-white h-9 px-5 rounded-lg text-[13px] font-semibold shadow-sm">
+            Add Transaction
+          </Button>
+        </div>
 
-            <div className="p-10 bg-slate-50/50 rounded-[32px] border border-slate-100 flex flex-col items-center text-center group hover:bg-white hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500">
-               <div className="h-16 w-16 bg-emerald-100/50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-                  <FileSpreadsheet className="h-8 w-8" />
-               </div>
-               <h4 className="text-lg font-black text-slate-900 mb-2">Mass Processing</h4>
-               <p className="text-slate-500 text-sm font-medium mb-6 leading-relaxed">Sync hundreds of records via secure CSV architecture.</p>
-               <Button onClick={() => navigate('/import', { state: { activeTab: 'csv' } })} variant="outline" className="rounded-xl font-bold h-10 border-slate-200">Execute</Button>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { label: 'Manual Entry',    desc: 'Type in a single transaction directly.',   icon: PenLine,       iconBg: 'bg-blue-50',    iconColor: 'text-blue-600',   tab: 'manual' },
+            { label: 'CSV / Excel',     desc: 'Import from spreadsheet or bank export.',  icon: FileSpreadsheet, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600',tab: 'csv' },
+            { label: 'PDF Statement',   desc: 'Parse transactions from a bank PDF.',       icon: Receipt,       iconBg: 'bg-orange-50',  iconColor: 'text-orange-500', tab: 'pdf' },
+          ].map((action, i) => (
+            <div
+              key={i}
+              onClick={() => navigate('/import', { state: { activeTab: action.tab } })}
+              className="flex items-center gap-4 p-4 bg-slate-50/60 rounded-xl border border-slate-100 hover:bg-white hover:border-slate-200 hover:shadow-sm cursor-pointer transition-all group"
+            >
+              <div className={`h-10 w-10 flex-shrink-0 ${action.iconBg} rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform`}>
+                <action.icon className={`h-4.5 w-4.5 ${action.iconColor}`} style={{ height: '18px', width: '18px' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[13.5px] font-semibold text-slate-900 leading-tight">{action.label}</p>
+                <p className="text-[11.5px] text-slate-400 font-medium mt-0.5 leading-snug">{action.desc}</p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-slate-300 flex-shrink-0 ml-auto group-hover:text-slate-500 transition-colors" />
             </div>
-
-            <div className="p-10 bg-slate-50/50 rounded-[32px] border border-slate-100 flex flex-col items-center text-center group hover:bg-white hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500">
-               <div className="h-16 w-16 bg-orange-100/50 text-orange-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-                  <Receipt className="h-8 w-8" />
-               </div>
-               <h4 className="text-lg font-black text-slate-900 mb-2">Deep Statement Scan</h4>
-               <p className="text-slate-500 text-sm font-medium mb-6 leading-relaxed">Convert complex banking PDFs into verified ledger data.</p>
-               <Button onClick={() => navigate('/import', { state: { activeTab: 'pdf' } })} variant="outline" className="rounded-xl font-bold h-10 border-slate-200">Execute</Button>
-            </div>
-          </div>
+          ))}
+        </div>
       </div>
     </div>
   );

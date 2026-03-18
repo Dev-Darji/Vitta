@@ -85,9 +85,9 @@ const HowItWorks = () => {
             
             <div className="relative">
               <div className="absolute inset-0 bg-accent/20 blur-3xl rounded-full" />
-              <div className="relative bg-white rounded-3xl p-10 shadow-2xl border border-slate-100">
-                <div className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center hover:border-accent transition-colors group cursor-pointer">
-                  <div className="w-20 h-20 bg-primary/5 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+              <div className="relative bg-white rounded-lg p-10 shadow-2xl border border-slate-100">
+                <div className="border-2 border-dashed border-slate-200 rounded-lg p-16 text-center hover:border-accent transition-colors group cursor-pointer">
+                  <div className="w-20 h-20 bg-primary/5 rounded-lg flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
                     <Upload className="h-10 w-10 text-primary" />
                   </div>
                   <p className="text-primary font-bold text-xl mb-2">Drop Statement Here</p>
@@ -101,14 +101,14 @@ const HowItWorks = () => {
           <motion.div {...fadeInUp} className="grid md:grid-cols-2 gap-16 items-center">
             <div className="order-2 md:order-1 relative">
               <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full" />
-              <div className="relative bg-[#0F392B] rounded-3xl p-8 shadow-2xl">
+              <div className="relative bg-[#0F392B] rounded-lg p-8 shadow-2xl">
                 <div className="space-y-4">
                   {[
                     { label: 'Amazon Business', cat: 'Office Supplies', val: '₹4,500' },
                     { label: 'WeWork Office', cat: 'Rent & Utilities', val: '₹45,000' },
                     { label: 'Uber for Business', cat: 'Travel', val: '₹1,200' }
                   ].map((row, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors">
+                    <div key={i} className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-md hover:bg-white/10 transition-colors">
                       <div className="flex flex-col">
                         <span className="text-white font-medium text-sm">{row.label}</span>
                         <span className="text-accent text-xs font-bold uppercase mt-1 px-2 py-0.5 bg-accent/10 rounded w-fit">{row.cat}</span>
@@ -178,7 +178,7 @@ const HowItWorks = () => {
             
             <div className="relative">
               <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-full" />
-              <div className="relative bg-white rounded-3xl p-8 shadow-2xl border border-slate-100 overflow-hidden">
+              <div className="relative bg-white rounded-lg p-8 shadow-2xl border border-slate-100 overflow-hidden">
                 <div className="absolute top-0 right-0 p-4">
                    <div className="w-12 h-12 bg-accent rounded-full flex items-center justify-center text-primary font-bold">PDF</div>
                 </div>
@@ -200,7 +200,7 @@ const HowItWorks = () => {
                     <span className="font-bold text-primary">Monthly Profit</span>
                     <span className="font-extrabold text-[#10B981] text-2xl">₹4,29,760</span>
                   </div>
-                  <Button className="w-full bg-primary hover:bg-primary/95 text-white rounded-xl py-6 font-bold flex items-center gap-2">
+                  <Button className="w-full bg-primary hover:bg-primary/95 text-white rounded-md py-6 font-bold flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
                     Export Full Report
                   </Button>
@@ -230,9 +230,9 @@ const HowItWorks = () => {
                 key={index}
                 {...fadeInUp}
                 transition={{ delay: index * 0.1 }}
-                className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-xl hover:-translate-y-1 transition-all group"
+                className="bg-white p-8 rounded-lg shadow-sm border border-slate-200 hover:shadow-xl hover:-translate-y-1 transition-all group"
               >
-                <div className="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-6 group-hover:bg-accent transition-colors">
+                <div className="w-14 h-14 bg-primary rounded-md flex items-center justify-center mb-6 group-hover:bg-accent transition-colors">
                   <feature.icon className="h-7 w-7 text-white group-hover:text-primary transition-colors" />
                 </div>
                 <h3 className="font-heading font-bold text-lg text-primary mb-3">

@@ -11,12 +11,189 @@ import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 
+/* ─── Font Injection ──────────────────────────────────────────────────────── */
+const FontStyle = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+    [data-accounts-root] { font-family: 'DM Sans', sans-serif; }
+    
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    [data-accounts-root] .account-card {
+      animation: cardIn 0.22s ease both;
+    }
+  `}</style>
+);
+
+/* ─── Shared Field Label ─────────────────────────────────────────────────── */
+const FieldLabel = ({ children }) => (
+  <Label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">
+    {children}
+  </Label>
+);
+
+/* ─── Account Type Config ────────────────────────────────────────────────── */
+const typeConfig = {
+  Bank: { icon: Building2, bg: 'bg-blue-50',    text: 'text-blue-600',    border: 'border-blue-100' },
+  Cash: { icon: Banknote,   bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100' },
+  Card: { icon: CreditCard, bg: 'bg-rose-50',    text: 'text-rose-500',    border: 'border-rose-100' },
+};
+
+/* ─── Account Card ───────────────────────────────────────────────────────── */
+const AccountCard = ({ account, cfg, Icon, index, getClientName, onEdit, onDelete }) => {
+  const [expanded, setExpanded] = useState(false);
+  const sym = account.currency === 'INR' ? '₹' : account.currency;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.97 }}
+      transition={{ duration: 0.2, delay: index * 0.04 }}
+    >
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200 transition-all duration-200 overflow-hidden">
+
+        {/* ── Top section: icon + name + balance ── */}
+        <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-4">
+          {/* Left: icon + name */}
+          <div className="flex items-center gap-3">
+            <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+              <Icon style={{ height: '18px', width: '18px' }} />
+            </div>
+            <div>
+              <p className="text-[15px] font-bold text-slate-900 leading-tight">{account.account_name}</p>
+              <p className="text-[12px] text-slate-400 font-medium mt-0.5">
+                {getClientName(account.client_id)}
+                {account.bank_name ? <span> · {account.bank_name}</span> : ''}
+              </p>
+            </div>
+          </div>
+
+          {/* Right: balance */}
+          <div className="text-right flex-shrink-0">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Balance</p>
+            <p className="text-[18px] font-bold text-slate-900 leading-tight">
+              {sym}{account.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+            <div className="flex items-center justify-end gap-1 mt-1">
+              <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span className="text-[10px] font-semibold text-emerald-500 tracking-wide">Active</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Expandable section ── */}
+        <AnimatePresence initial={false}>
+          {expanded && (
+            <motion.div
+              key="details"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <div className="px-5 pb-4 space-y-4">
+                {/* Inflow / Outflow */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <ArrowRight className="h-3 w-3 text-emerald-500 rotate-[-45deg]" />
+                      <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Inflow</p>
+                    </div>
+                    <p className="text-[16px] font-bold text-emerald-700">{sym}0.00</p>
+                  </div>
+                  <div className="px-4 py-3 bg-rose-50 rounded-xl border border-rose-100">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <ArrowRight className="h-3 w-3 text-rose-500 rotate-[135deg]" />
+                      <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Outflow</p>
+                    </div>
+                    <p className="text-[16px] font-bold text-rose-600">{sym}0.00</p>
+                  </div>
+                </div>
+
+                {/* Edit / Delete actions */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={onEdit}
+                      className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={onDelete}
+                      className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Toggle — right aligned */}
+                  <button
+                    onClick={() => setExpanded(false)}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-slate-600 uppercase tracking-wider transition-colors"
+                  >
+                    Hide Details <motion.span animate={{ rotate: 180 }} style={{ display:'inline-block' }} className="text-[10px]">▾</motion.span>
+                  </button>
+                </div>
+
+                {/* Meta grid */}
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 pt-2 border-t border-slate-100">
+                  <div>
+                    <p className="text-[9.5px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Currency</p>
+                    <p className="text-[13px] font-semibold text-slate-800">{account.currency}</p>
+                  </div>
+                  {account.opening_balance_date && (
+                    <div>
+                      <p className="text-[9.5px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Since</p>
+                      <p className="text-[13px] font-semibold text-slate-800">
+                        {new Date(account.opening_balance_date).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-[9.5px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Opening Balance</p>
+                    <p className="text-[13px] font-semibold text-slate-800">{sym}{account.opening_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9.5px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Type</p>
+                    <p className="text-[13px] font-semibold text-slate-800">{account.account_type}</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Toggle footer (when collapsed) ── */}
+        {!expanded && (
+          <div className="px-5 pb-4 flex items-center justify-end">
+            <button
+              onClick={() => setExpanded(true)}
+              className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-slate-600 uppercase tracking-wider transition-colors"
+            >
+              Show Details <span className="text-[10px]">▾</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════════════════════════════════════════ */
 const Accounts = () => {
   const [accounts, setAccounts] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
-  
+
   const [newAccount, setNewAccount] = useState({
     client_id: '',
     account_name: '',
@@ -32,86 +209,46 @@ const Accounts = () => {
   const [editingAccount, setEditingAccount] = useState(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
-  // New Client on the fly
   const [isClientOpen, setIsClientOpen] = useState(false);
-  const [newClient, setNewClient] = useState({
-    name: '',
-    business_type: '',
-    currency: 'INR',
-    country: 'India',
-    notes: ''
-  });
+  const [newClient, setNewClient] = useState({ name: '', business_type: '', currency: 'INR', country: 'India', notes: '' });
   const [clientSubmitting, setClientSubmitting] = useState(false);
 
   const location = useLocation();
 
   useEffect(() => {
     fetchInitialData();
-    if (location.state?.openAdd) {
-      setIsOpen(true);
-    }
+    if (location.state?.openAdd) setIsOpen(true);
   }, [location.state]);
 
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const [accRes, clRes] = await Promise.all([
-        api.get('/accounts'),
-        api.get('/clients')
-      ]);
+      const [accRes, clRes] = await Promise.all([api.get('/accounts'), api.get('/clients')]);
       setAccounts(accRes.data);
       setClients(clRes.data);
-      if (clRes.data.length > 0) {
-        setNewAccount(prev => ({ ...prev, client_id: clRes.data[0].id }));
-      }
-    } catch (error) {
-      toast.error('Failed to load data');
-    } finally {
-      setLoading(false);
-    }
+      if (clRes.data.length > 0) setNewAccount(prev => ({ ...prev, client_id: clRes.data[0].id }));
+    } catch { toast.error('Failed to load data'); }
+    finally { setLoading(false); }
   };
 
   const handleCreateAccount = async (e) => {
     e.preventDefault();
-    if (!newAccount.client_id) {
-      toast.error('Please select or create a client first');
-      return;
-    }
-    
+    if (!newAccount.client_id) { toast.error('Select a client'); return; }
     try {
       setSubmitting(true);
       await api.post('/accounts', newAccount);
-      toast.success('Account created successfully');
+      toast.success('Account created');
       setIsOpen(false);
-      setNewAccount({
-        client_id: clients[0]?.id || '',
-        account_name: '',
-        account_type: 'Bank',
-        bank_name: '',
-        account_number: '',
-        opening_balance: 0,
-        opening_balance_date: new Date().toISOString().split('T')[0],
-        currency: 'INR',
-        notes: ''
-      });
+      setNewAccount({ client_id: clients[0]?.id || '', account_name: '', account_type: 'Bank', bank_name: '', account_number: '', opening_balance: 0, opening_balance_date: new Date().toISOString().split('T')[0], currency: 'INR', notes: '' });
       fetchInitialData();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to create account');
-    } finally {
-      setSubmitting(false);
-    }
+    } catch { toast.error('Failed to create account'); }
+    finally { setSubmitting(false); }
   };
 
   const handleDeleteAccount = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this account? associated transactions will also be deleted.')) return;
-
-    try {
-      await api.delete(`/accounts/${id}`);
-      toast.success('Account deleted');
-      fetchInitialData();
-    } catch (error) {
-      toast.error('Failed to delete account');
-    }
+    if (!window.confirm('Delete this account and all linked transactions?')) return;
+    try { await api.delete(`/accounts/${id}`); toast.success('Account removed'); fetchInitialData(); }
+    catch { toast.error('Failed to delete account'); }
   };
 
   const handleUpdateAccount = async (e) => {
@@ -119,494 +256,266 @@ const Accounts = () => {
     try {
       setSubmitting(true);
       await api.put(`/accounts/${editingAccount.id}`, editingAccount);
-      toast.success('Account updated successfully');
+      toast.success('Account updated');
       setIsEditOpen(false);
       fetchInitialData();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to update account');
-    } finally {
-      setSubmitting(false);
-    }
+    } catch { toast.error('Failed to update account'); }
+    finally { setSubmitting(false); }
   };
 
-  const getClientName = (clientId) => {
-    return clients.find(c => c.id === clientId)?.name || 'Unknown Client';
-  };
+  const getClientName = (clientId) => clients.find(c => c.id === clientId)?.name || 'Unknown';
 
   const handleCreateClient = async (e) => {
     e.preventDefault();
-    if (!newClient.name) {
-      toast.error('Client name is required');
-      return;
-    }
-
+    if (!newClient.name) return;
     try {
       setClientSubmitting(true);
       const response = await api.post('/clients', newClient);
-      toast.success('Client created successfully');
+      toast.success('Client registered');
       setIsClientOpen(false);
-      
-      // Refresh clients and auto-select the new one
       const clRes = await api.get('/clients');
       setClients(clRes.data);
       setNewAccount(prev => ({ ...prev, client_id: response.data.id }));
-      
-      setNewClient({
-        name: '',
-        business_type: '',
-        currency: 'INR',
-        country: 'India',
-        notes: ''
-      });
-    } catch (error) {
-      toast.error('Failed to create client');
-    } finally {
-      setClientSubmitting(false);
-    }
+    } catch { toast.error('Failed to create client'); }
+    finally { setClientSubmitting(false); }
   };
 
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
 
-  return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Financial Accounts</h1>
-          <p className="text-slate-500 font-medium">Manage ledgers for Banks, Cash, and Credit Cards</p>
+  /* ─── Dialog Form Fields (shared between create/edit) ─── */
+  const AccountFormFields = ({ data, onChange, isEdit = false }) => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        {!isEdit && (
+          <div>
+            <FieldLabel>Linked Client</FieldLabel>
+            <Select value={data.client_id} onValueChange={(val) => onChange({ client_id: val })}>
+              <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl border-slate-100">
+                {clients.map(c => <SelectItem key={c.id} value={c.id} className="text-[13px]">{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <div className={!isEdit ? '' : 'col-span-2'}>
+          <FieldLabel>Account Name</FieldLabel>
+          <Input
+            placeholder="e.g. HDFC Salary"
+            value={data.account_name}
+            onChange={e => onChange({ account_name: e.target.value })}
+            required
+            className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
+          />
         </div>
-        
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <FieldLabel>Account Type</FieldLabel>
+          <Select value={data.account_type} onValueChange={(val) => onChange({ account_type: val })}>
+            <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-slate-100">
+              <SelectItem value="Bank" className="text-[13px]">Bank Account</SelectItem>
+              <SelectItem value="Cash" className="text-[13px]">Cash in Hand</SelectItem>
+              <SelectItem value="Card" className="text-[13px]">Credit Card</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <FieldLabel>Currency</FieldLabel>
+          <Select value={data.currency} onValueChange={(val) => onChange({ currency: val })}>
+            <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-slate-100">
+              <SelectItem value="INR" className="text-[13px]">INR (₹)</SelectItem>
+              <SelectItem value="USD" className="text-[13px]">USD ($)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <FieldLabel>Opening Balance</FieldLabel>
+          <Input
+            type="number"
+            value={data.opening_balance}
+            onChange={e => onChange({ opening_balance: parseFloat(e.target.value) || 0 })}
+            required
+            className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px]"
+          />
+        </div>
+        <div>
+          <FieldLabel>As of Date</FieldLabel>
+          <Input
+            type="date"
+            value={data.opening_balance_date}
+            onChange={e => onChange({ opening_balance_date: e.target.value })}
+            required
+            className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ─────────────────────── RENDER ─────────────────────── */
+  return (
+    <div data-accounts-root className="space-y-7 pb-20">
+      <FontStyle />
+
+      {/* ── Page Header ── */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-5 pt-2">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-[3px] h-5 bg-slate-800 rounded-full" />
+            <h1 className="text-[22px] font-bold tracking-tight text-slate-900 leading-none">Accounts</h1>
+          </div>
+          <p className="text-[12px] text-slate-400 font-medium ml-[18px]">Monitor balances and manage financial ledgers.</p>
+        </div>
+
+        {/* ── Create Account Dialog ── */}
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90 text-white px-6 py-6 rounded-2xl font-bold shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95">
-              <Plus className="h-5 w-5 mr-2" /> Add New Account
+            <Button className="bg-slate-900 hover:bg-black text-white h-9 px-5 rounded-lg text-[13px] font-semibold shadow-sm flex items-center gap-2">
+              <Plus className="h-4 w-4" />Add Account
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-xl rounded-[32px] border-none shadow-2xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="bg-slate-900 p-8 text-white relative shrink-0 overflow-hidden">
-               <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/20 rounded-full blur-3xl opacity-50" />
-               <DialogHeader>
-                  <DialogTitle className="text-3xl font-black tracking-tight">Financial Source Setup</DialogTitle>
-                  <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] mt-2 flex items-center gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-accent" />
-                    Register New Asset Account
-                  </p>
-               </DialogHeader>
+          <DialogContent className="sm:max-w-[480px] rounded-2xl border border-slate-100 shadow-2xl p-0 overflow-hidden bg-white">
+            <div className="px-7 py-5 border-b border-slate-100">
+              <DialogHeader>
+                <DialogTitle className="text-[17px] font-bold text-slate-900">New Ledger Account</DialogTitle>
+                <p className="text-[11.5px] text-slate-400 mt-0.5">Initialize a new asset source for tracking.</p>
+              </DialogHeader>
             </div>
-            
-            <form onSubmit={handleCreateAccount} className="overflow-y-auto flex-1">
-              <div className="p-8 space-y-6 bg-white">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Client Selection */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-slate-700 mb-2 block">Linked Client</Label>
-                    <div className="flex gap-2">
-                      <Select 
-                        value={newAccount.client_id} 
-                        onValueChange={(val) => setNewAccount({...newAccount, client_id: val})}
-                      >
-                        <SelectTrigger className="flex-1 rounded-xl border-slate-200 py-6 font-medium">
-                          <SelectValue placeholder="Select Client" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {clients.map(client => (
-                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Dialog open={isClientOpen} onOpenChange={setIsClientOpen}>
-                        <DialogTrigger asChild>
-                          <Button type="button" variant="outline" className="h-[52px] w-[52px] rounded-xl border-slate-200 p-0 shrink-0 hover:bg-primary/5 hover:text-primary hover:border-primary/20 transition-all">
-                            <Plus className="h-5 w-5" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-md rounded-[32px] p-0 overflow-hidden shadow-2xl border-none">
-                          <div className="bg-primary/5 p-8 border-b border-primary/10">
-                            <h3 className="text-xl font-black text-primary">Quick Add Client</h3>
-                            <p className="text-slate-500 text-sm font-medium">Create a new organization on the fly</p>
-                          </div>
-                          <div className="p-8 space-y-4">
-                            <div className="space-y-1.5">
-                              <Label className="text-sm font-semibold text-slate-700 mb-2 block">Organization Name</Label>
-                              <Input 
-                                placeholder="Client Name"
-                                value={newClient.name}
-                                onChange={e => setNewClient({...newClient, name: e.target.value})}
-                                className="rounded-xl"
-                              />
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-sm font-semibold text-slate-700 mb-2 block">Business Type</Label>
-                              <Input 
-                                placeholder="Retail, IT, etc."
-                                value={newClient.business_type}
-                                onChange={e => setNewClient({...newClient, business_type: e.target.value})}
-                                className="rounded-xl"
-                              />
-                            </div>
-                            <Button 
-                              onClick={handleCreateClient} 
-                              disabled={clientSubmitting}
-                              className="w-full h-12 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl shadow-lg shadow-primary/20"
-                            >
-                              {clientSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create & Select'}
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </div>
-
-                  {/* Account Name */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-slate-700 mb-2 block">Account Name</Label>
-                    <Input 
-                      placeholder="e.g. HDFC Salary" 
-                      value={newAccount.account_name}
-                      onChange={(e) => setNewAccount({...newAccount, account_name: e.target.value})}
-                      required
-                      className="rounded-xl border-slate-200 py-6 focus:ring-primary/20 font-medium"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Account Type */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-slate-700 mb-2 block">Account Type</Label>
-                    <Select 
-                      value={newAccount.account_type} 
-                      onValueChange={(val) => setNewAccount({...newAccount, account_type: val})}
-                    >
-                      <SelectTrigger className="rounded-xl border-slate-200 py-6 font-medium">
-                        <SelectValue placeholder="Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Bank">Bank Account</SelectItem>
-                        <SelectItem value="Cash">Cash in Hand</SelectItem>
-                        <SelectItem value="Card">Credit Card</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Currency */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-slate-700 mb-2 block">Currency</Label>
-                    <Select 
-                      value={newAccount.currency} 
-                      onValueChange={(val) => setNewAccount({...newAccount, currency: val})}
-                    >
-                      <SelectTrigger className="rounded-xl border-slate-200 py-6 font-medium">
-                        <SelectValue placeholder="Currency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="INR">INR (₹)</SelectItem>
-                        <SelectItem value="USD">USD ($)</SelectItem>
-                        <SelectItem value="GBP">GBP (£)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {newAccount.account_type !== 'Cash' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-slate-700 mb-2 block">Bank / Provider</Label>
-                      <Input 
-                        placeholder="e.g. HDFC Bank" 
-                        value={newAccount.bank_name}
-                        onChange={(e) => setNewAccount({...newAccount, bank_name: e.target.value})}
-                        className="rounded-xl border-slate-200 py-6 focus:ring-primary/20 font-medium"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-slate-700 mb-2 block">A/C Number (Optional)</Label>
-                      <Input 
-                        placeholder="•••• •••• •••• 1234" 
-                        value={newAccount.account_number}
-                        onChange={(e) => setNewAccount({...newAccount, account_number: e.target.value})}
-                        className="rounded-xl border-slate-200 py-6 focus:ring-primary/20 font-medium"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-slate-700 mb-2 block">Opening Balance</Label>
-                    <Input 
-                      type="number"
-                      placeholder="0.00" 
-                      value={newAccount.opening_balance}
-                      onChange={(e) => setNewAccount({...newAccount, opening_balance: parseFloat(e.target.value) || 0})}
-                      onWheel={(e) => e.target.blur()}
-                      required
-                      className="rounded-xl border-slate-200 py-6 focus:ring-primary/20 font-medium"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-slate-700 mb-2 block">As of Date</Label>
-                    <Input 
-                      type="date"
-                      value={newAccount.opening_balance_date}
-                      onChange={(e) => setNewAccount({...newAccount, opening_balance_date: e.target.value})}
-                      required
-                      className="rounded-xl border-slate-200 py-6 focus:ring-primary/20 font-medium"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-slate-700 mb-2 block">Notes & Settings</Label>
-                  <textarea 
-                    placeholder="Internal reference notes..." 
-                    value={newAccount.notes}
-                    onChange={(e) => setNewAccount({...newAccount, notes: e.target.value})}
-                    className="w-full rounded-xl border-slate-200 p-4 focus:ring-primary/20 font-medium min-h-[80px] outline-none border focus:border-primary"
-                  />
-                </div>
-              </div>
-
-              <DialogFooter className="p-8 bg-slate-50 border-t border-slate-100 flex-row gap-4 shrink-0">
-                <Button 
-                  type="button"
-                  variant="outline" 
-                  onClick={() => setIsOpen(false)}
-                  className="flex-1 rounded-xl py-6 font-bold border-slate-200"
-                >
+            <form onSubmit={handleCreateAccount} className="px-7 py-6 space-y-5">
+              <AccountFormFields
+                data={newAccount}
+                onChange={(patch) => setNewAccount(prev => ({ ...prev, ...patch }))}
+              />
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} className="h-9 px-5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100">
                   Cancel
                 </Button>
-                <Button 
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-[2] bg-primary hover:bg-primary/90 text-white rounded-xl py-6 font-bold shadow-lg shadow-primary/20"
-                >
-                  {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Activate Ledger'}
+                <Button type="submit" disabled={submitting} className="h-9 px-6 rounded-lg bg-primary text-white text-[13px] font-semibold shadow-sm">
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Account'}
                 </Button>
-              </DialogFooter>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Stats Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-primary p-8 rounded-[40px] text-white overflow-hidden relative"
-        >
+      {/* ── Summary Stats ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Net Worth */}
+        <div className="bg-slate-900 px-6 py-5 rounded-xl text-white relative overflow-hidden group">
           <div className="relative z-10">
-            <div className="flex items-center gap-3 opacity-60 mb-2">
-              <Wallet className="h-4 w-4" />
-              <span className="text-[10px] font-black tracking-widest uppercase">Combined Portfolio</span>
-            </div>
-            <p className="text-4xl font-black tracking-tight mb-2">₹{totalBalance.toLocaleString('en-IN')}</p>
-            <p className="text-xs font-medium text-white/50">Current net liquid position</p>
+            <p className="text-[10px] font-semibold tracking-widest uppercase text-white/40 mb-2 flex items-center gap-1.5">
+              <Wallet className="h-3 w-3" />Total Net Worth
+            </p>
+            <p className="text-[26px] font-bold tracking-tight leading-none">
+              <span className="text-[15px] font-medium opacity-50 mr-0.5">₹</span>
+              {totalBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
           </div>
-          <div className="absolute -bottom-10 -right-10 opacity-10">
-            <Wallet className="h-40 w-40" />
-          </div>
-        </motion.div>
+          <Wallet className="absolute -bottom-3 -right-3 h-14 w-14 opacity-[0.06] group-hover:scale-110 transition-transform duration-300" />
+        </div>
 
-        <Card className="rounded-2xl border-slate-100 p-8 flex items-center gap-6 shadow-sm">
-          <div className="h-16 w-16 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
-            <Building2 className="h-8 w-8" />
+        {/* Clients */}
+        <div className="bg-white px-6 py-5 rounded-xl border border-slate-100 flex items-center gap-4 shadow-sm">
+          <div className="h-10 w-10 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Building2 className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-[10px] font-black tracking-widest uppercase text-slate-400 mb-1">Organizations</p>
-            <p className="text-2xl font-black text-slate-900">{clients.length}</p>
+            <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 mb-1">Total Clients</p>
+            <p className="text-[22px] font-bold text-slate-900 leading-none">{clients.length}</p>
           </div>
-        </Card>
+        </div>
 
-        <Card className="rounded-2xl border-slate-100 p-8 flex items-center gap-6 shadow-sm">
-          <div className="h-16 w-16 bg-green-50 text-green-600 rounded-xl flex items-center justify-center shrink-0">
-            <CreditCard className="h-8 w-8" />
+        {/* Active Ledgers */}
+        <div className="bg-white px-6 py-5 rounded-xl border border-slate-100 flex items-center gap-4 shadow-sm">
+          <div className="h-10 w-10 bg-emerald-50 text-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <CreditCard className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-[10px] font-black tracking-widest uppercase text-slate-400 mb-1">Active Accounts</p>
-            <p className="text-2xl font-black text-slate-900">{accounts.length}</p>
+            <p className="text-[10px] font-semibold tracking-widest uppercase text-slate-400 mb-1">Active Ledgers</p>
+            <p className="text-[22px] font-bold text-slate-900 leading-none">{accounts.length}</p>
           </div>
-        </Card>
+        </div>
       </div>
 
-      {/* Accounts List */}
+      {/* ── Content ── */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-10 w-10 text-primary animate-spin" />
+        <div className="flex items-center justify-center py-32">
+          <Loader2 className="h-7 w-7 text-primary/30 animate-spin" />
         </div>
       ) : accounts.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-2xl border border-slate-100">
-          <div className="h-20 w-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CreditCard className="h-10 w-10 text-slate-300" />
+        <div className="text-center py-28 bg-slate-50/40 rounded-2xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center">
+          <div className="h-16 w-16 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mb-6">
+            <CreditCard className="h-7 w-7 text-slate-200" />
           </div>
-          <h3 className="text-xl font-bold text-slate-900 mb-2">No accounts created</h3>
-          <p className="text-slate-500 mb-8 max-w-sm mx-auto">First register a client and then add their bank or cash ledgers here.</p>
-          <Button onClick={() => setIsOpen(true)} className="bg-primary hover:bg-primary/90">
-            Get Started
+          <h3 className="text-[18px] font-bold text-slate-800 mb-2">No Accounts Yet</h3>
+          <p className="text-[13px] text-slate-400 mb-8 max-w-xs mx-auto leading-relaxed">
+            Add your first bank account or cash ledger to start tracking transactions.
+          </p>
+          <Button onClick={() => setIsOpen(true)} className="bg-slate-900 hover:bg-black text-white px-7 h-10 rounded-xl text-[13px] font-semibold shadow-sm">
+            Add First Account
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-          <AnimatePresence>
-            {accounts.map((account, index) => (
-              <motion.div
-                key={account.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <Card className="rounded-2xl border-slate-100 overflow-hidden hover:shadow-xl transition-all duration-300 group">
-                  <CardContent className="p-8">
-                    <div className="flex justify-between items-start mb-10">
-                      <div className="flex items-center gap-4">
-                        <div className={`h-14 w-14 rounded-2xl flex items-center justify-center
-                          ${account.account_type === 'Bank' ? 'bg-blue-50 text-blue-600' : 
-                            account.account_type === 'Cash' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}`}>
-                          {account.account_type === 'Bank' ? <Building2 className="h-7 w-7" /> : 
-                           account.account_type === 'Cash' ? <Banknote className="h-7 w-7" /> : <CreditCard className="h-7 w-7" />}
-                        </div>
-                        <div>
-                          <h3 className="text-xl font-bold text-slate-900 tracking-tight">{account.account_name}</h3>
-                          <p className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full bg-primary/20" />
-                            {getClientName(account.client_id)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => { setEditingAccount(account); setIsEditOpen(true); }} className="text-slate-200 hover:text-primary rounded-full h-10 w-10">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteAccount(account.id)} className="text-slate-200 hover:text-red-500 rounded-full h-10 w-10">
-                          <Trash2 className="h-5 w-5" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-6 p-6 bg-slate-50 rounded-2xl mb-1">
-                      <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Available Balance</p>
-                        <p className="text-2xl font-black text-slate-900">
-                          {account.currency === 'INR' ? '₹' : account.currency} {account.balance.toLocaleString('en-IN')}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Type</p>
-                        <p className="text-sm font-bold text-slate-600">{account.account_type}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold px-2 pt-4">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-3 w-3" />
-                        <span>OPENED {account.opening_balance_date}</span>
-                      </div>
-                      {account.bank_name && (
-                        <div className="flex items-center gap-1 overflow-hidden">
-                          <span>{account.bank_name.toUpperCase()}</span>
-                          {account.account_number && <span> •••• {account.account_number.slice(-4)}</span>}
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <AnimatePresence mode="popLayout">
+            {accounts.map((account, index) => {
+              const cfg = typeConfig[account.account_type] || typeConfig.Bank;
+              const Icon = cfg.icon;
+              return (
+                <AccountCard
+                  key={account.id}
+                  account={account}
+                  cfg={cfg}
+                  Icon={Icon}
+                  index={index}
+                  getClientName={getClientName}
+                  onEdit={() => { setEditingAccount(account); setIsEditOpen(true); }}
+                  onDelete={() => handleDeleteAccount(account.id)}
+                />
+              );
+            })}
           </AnimatePresence>
         </div>
       )}
-      {/* Edit Account Dialog */}
+
+      {/* ── Edit Account Dialog ── */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-xl rounded-2xl border-none shadow-2xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
-          <div className="bg-primary p-8 text-white relative shrink-0">
+        <DialogContent className="sm:max-w-[440px] rounded-2xl border border-slate-100 shadow-2xl p-0 overflow-hidden bg-white">
+          <div className="px-7 py-5 border-b border-slate-100">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-black">Edit Account</DialogTitle>
-              <p className="text-white/70 font-medium text-sm">Modify account details and balance</p>
+              <DialogTitle className="text-[17px] font-bold text-slate-900">Edit Account</DialogTitle>
+              <p className="text-[11.5px] text-slate-400 mt-0.5">Update ledger configuration and details.</p>
             </DialogHeader>
           </div>
-          
+
           {editingAccount && (
-            <form onSubmit={handleUpdateAccount} className="overflow-y-auto flex-1">
-              <div className="p-8 space-y-6 bg-white">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-slate-700 mb-2 block">Account Name</Label>
-                    <Input 
-                      value={editingAccount.account_name}
-                      onChange={(e) => setEditingAccount({...editingAccount, account_name: e.target.value})}
-                      required
-                      className="rounded-xl"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-slate-700 mb-2 block">Account Type</Label>
-                    <Select 
-                      value={editingAccount.account_type} 
-                      onValueChange={(val) => setEditingAccount({...editingAccount, account_type: val})}
-                    >
-                      <SelectTrigger className="rounded-xl">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Bank">Bank Account</SelectItem>
-                        <SelectItem value="Cash">Cash in Hand</SelectItem>
-                        <SelectItem value="Card">Credit Card</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-slate-700 mb-2 block">Opening Balance</Label>
-                    <Input 
-                      type="number"
-                      value={editingAccount.opening_balance}
-                      onChange={(e) => setEditingAccount({...editingAccount, opening_balance: parseFloat(e.target.value) || 0})}
-                      required
-                      className="rounded-xl"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-slate-700 mb-2 block">As of Date</Label>
-                    <Input 
-                      type="date"
-                      value={editingAccount.opening_balance_date}
-                      onChange={(e) => setEditingAccount({...editingAccount, opening_balance_date: e.target.value})}
-                      required
-                      className="rounded-xl"
-                    />
-                  </div>
-                </div>
-
-                {editingAccount.account_type !== 'Cash' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-slate-700 mb-2 block">Bank Name</Label>
-                      <Input 
-                        value={editingAccount.bank_name || ''}
-                        onChange={(e) => setEditingAccount({...editingAccount, bank_name: e.target.value})}
-                        className="rounded-xl"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-slate-700 mb-2 block">A/C Number</Label>
-                      <Input 
-                        value={editingAccount.account_number || ''}
-                        onChange={(e) => setEditingAccount({...editingAccount, account_number: e.target.value})}
-                        className="rounded-xl"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <DialogFooter className="p-8 bg-slate-50 border-t border-slate-100 shrink-0">
-                <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)} className="rounded-xl">Cancel</Button>
-                <Button type="submit" disabled={submitting} className="rounded-xl bg-primary text-white">
+            <form onSubmit={handleUpdateAccount} className="px-7 py-6 space-y-5">
+              <AccountFormFields
+                data={editingAccount}
+                onChange={(patch) => setEditingAccount(prev => ({ ...prev, ...patch }))}
+                isEdit
+              />
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)} className="h-9 px-5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={submitting} className="h-9 px-6 rounded-lg bg-primary text-white text-[13px] font-semibold shadow-sm">
                   {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Changes'}
                 </Button>
-              </DialogFooter>
+              </div>
             </form>
           )}
         </DialogContent>

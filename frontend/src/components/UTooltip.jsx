@@ -16,7 +16,7 @@ const UTooltip = ({ children, content, side = "top", align = "center" }) => {
         <TooltipContent 
           side={side} 
           align={align}
-          className="bg-slate-900 text-white border-slate-800 rounded-xl px-4 py-2.5 text-xs font-bold shadow-2xl animate-in fade-in zoom-in duration-200"
+          className="bg-slate-900 text-white border-slate-800 rounded-md px-4 py-2.5 text-xs font-bold shadow-2xl animate-in fade-in zoom-in duration-200"
         >
           {content}
         </TooltipContent>

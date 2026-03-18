@@ -1,282 +1,286 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Plus, Search, MapPin, Globe, FileText, Trash2, Edit2, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Building2, Plus, Search, MapPin, FileText, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 
+/* ─── Font ─────────────────────────────────────────────────────────────── */
+const FontStyle = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+    [data-clients] { font-family: 'DM Sans', sans-serif; }
+  `}</style>
+);
+
+/* ─── Field Label ────────────────────────────────────────────────────────── */
+const FieldLabel = ({ children }) => (
+  <Label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 block">
+    {children}
+  </Label>
+);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+═══════════════════════════════════════════════════════════════════════════ */
 const Clients = () => {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // New Client Form
-  const [newClient, setNewClient] = useState({
-    name: '',
-    business_type: '',
-    currency: 'INR',
-    country: 'India',
-    notes: ''
-  });
   const [submitting, setSubmitting] = useState(false);
+
+  const [newClient, setNewClient] = useState({
+    name: '', business_type: '', currency: 'INR', country: 'India', notes: ''
+  });
 
   const location = useLocation();
 
   useEffect(() => {
     fetchClients();
-    if (location.state?.openAdd) {
-      setIsAddOpen(true);
-    }
+    if (location.state?.openAdd) setIsAddOpen(true);
   }, [location.state]);
 
   const fetchClients = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/clients');
-      setClients(response.data);
-    } catch (error) {
-      toast.error('Failed to load clients');
-    } finally {
-      setLoading(false);
-    }
+      const res = await api.get('/clients');
+      setClients(res.data);
+    } catch { toast.error('Failed to load clients'); }
+    finally { setLoading(false); }
   };
 
   const handleAddClient = async () => {
-    if (!newClient.name) {
-      toast.error('Client name is required');
-      return;
-    }
-
+    if (!newClient.name) { toast.error('Client name is required'); return; }
     try {
       setSubmitting(true);
       await api.post('/clients', newClient);
-      toast.success('Client added successfully');
+      toast.success('Client added');
       setIsAddOpen(false);
-      setNewClient({
-        name: '',
-        business_type: '',
-        currency: 'INR',
-        country: 'India',
-        notes: ''
-      });
+      setNewClient({ name: '', business_type: '', currency: 'INR', country: 'India', notes: '' });
       fetchClients();
-    } catch (error) {
-      toast.error('Failed to add client');
-    } finally {
-      setSubmitting(false);
-    }
+    } catch { toast.error('Failed to add client'); }
+    finally { setSubmitting(false); }
   };
 
   const handleDeleteClient = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this client? All associated accounts will remain but may need re-linking.')) return;
-    
-    try {
-      await api.delete(`/clients/${id}`);
-      toast.success('Client deleted');
-      fetchClients();
-    } catch (error) {
-      toast.error('Failed to delete client');
-    }
+    if (!window.confirm('Delete this client?')) return;
+    try { await api.delete(`/clients/${id}`); toast.success('Client removed'); fetchClients(); }
+    catch { toast.error('Failed to delete client'); }
   };
 
-  const filteredClients = clients.filter(client => 
-    client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.business_type?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredClients = clients.filter(c =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.business_type?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      {/* Header section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div data-clients className="space-y-6 pb-20">
+      <FontStyle />
+
+      {/* ── Header ── */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pt-2">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Clients & Organizations</h1>
-          <p className="text-slate-500 font-medium">Manage multiple business entities from a single dashboard</p>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-[3px] h-5 bg-slate-800 rounded-full" />
+            <h1 className="text-[22px] font-bold tracking-tight text-slate-900 leading-none">Clients</h1>
+          </div>
+          <p className="text-[12px] text-slate-400 font-medium ml-[18px]">Manage business entities and client profiles.</p>
         </div>
-        
+
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90 text-white px-6 py-6 rounded-xl font-bold shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95">
-              <Plus className="h-5 w-5 mr-2" /> Add Client
+            <Button className="bg-slate-900 hover:bg-black text-white h-9 px-5 rounded-lg text-[13px] font-semibold shadow-sm flex items-center gap-2">
+              <Plus className="h-4 w-4" />Add Client
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] rounded-2xl border-none shadow-2xl p-0 overflow-hidden">
-            <div className="bg-slate-900 p-8 text-white relative">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full blur-3xl -mr-16 -mt-16" />
+          <DialogContent className="sm:max-w-[440px] rounded-2xl border border-slate-100 shadow-2xl p-0 overflow-hidden bg-white">
+            <div className="px-7 py-5 border-b border-slate-100">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-black tracking-tight">Register New Client</DialogTitle>
-                <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">Foundational Entity Setup</p>
+                <DialogTitle className="text-[17px] font-bold text-slate-900">New Client</DialogTitle>
+                <p className="text-[11.5px] text-slate-400 mt-0.5">Register a new business entity or individual client.</p>
               </DialogHeader>
             </div>
-            
-            <div className="p-8 space-y-6 bg-white">
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-slate-700 mb-2 block">Organization Name</Label>
-                <Input 
-                  placeholder="e.g. ABC Traders Pvt Ltd" 
+
+            <div className="px-7 py-6 space-y-4">
+              <div>
+                <FieldLabel>Organization Name</FieldLabel>
+                <Input
+                  placeholder="e.g. ABC Traders Pvt Ltd"
                   value={newClient.name}
-                  onChange={(e) => setNewClient({...newClient, name: e.target.value})}
-                  className="rounded-xl border-slate-200 py-6 focus:ring-primary/20 font-medium"
+                  onChange={e => setNewClient({ ...newClient, name: e.target.value })}
+                  className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-slate-700 mb-2 block">Business Type</Label>
-                  <Input 
-                    placeholder="e.g. Retail" 
+                <div>
+                  <FieldLabel>Business Type</FieldLabel>
+                  <Input
+                    placeholder="e.g. Retail"
                     value={newClient.business_type}
-                    onChange={(e) => setNewClient({...newClient, business_type: e.target.value})}
-                    className="rounded-xl border-slate-200 py-6 focus:ring-primary/20 font-medium"
+                    onChange={e => setNewClient({ ...newClient, business_type: e.target.value })}
+                    className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-slate-700 mb-2 block">Currency</Label>
-                  <Select 
-                    value={newClient.currency} 
-                    onValueChange={(val) => setNewClient({...newClient, currency: val})}
-                  >
-                    <SelectTrigger className="rounded-xl border-slate-200 py-6 font-medium">
-                      <SelectValue placeholder="Select currency" />
+                <div>
+                  <FieldLabel>Currency</FieldLabel>
+                  <Select value={newClient.currency} onValueChange={v => setNewClient({ ...newClient, currency: v })}>
+                    <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
+                      <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="INR">INR (₹)</SelectItem>
-                      <SelectItem value="USD">USD ($)</SelectItem>
-                      <SelectItem value="GBP">GBP (£)</SelectItem>
-                      <SelectItem value="EUR">EUR (€)</SelectItem>
+                    <SelectContent className="rounded-xl border-slate-100">
+                      <SelectItem value="INR" className="text-[13px]">INR (₹)</SelectItem>
+                      <SelectItem value="USD" className="text-[13px]">USD ($)</SelectItem>
+                      <SelectItem value="GBP" className="text-[13px]">GBP (£)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-slate-700 mb-2 block">Country</Label>
-                <Input 
-                  placeholder="India" 
+              <div>
+                <FieldLabel>Country</FieldLabel>
+                <Input
+                  placeholder="India"
                   value={newClient.country}
-                  onChange={(e) => setNewClient({...newClient, country: e.target.value})}
-                  className="rounded-xl border-slate-200 py-6 focus:ring-primary/20 font-medium"
+                  onChange={e => setNewClient({ ...newClient, country: e.target.value })}
+                  className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-slate-700 mb-2 block">Notes (Internal)</Label>
-                <textarea 
-                  placeholder="Any additional details..." 
+              <div>
+                <FieldLabel>Notes</FieldLabel>
+                <textarea
+                  placeholder="Additional details..."
                   value={newClient.notes}
-                  onChange={(e) => setNewClient({...newClient, notes: e.target.value})}
-                  className="w-full rounded-xl border-slate-200 p-4 focus:ring-primary/20 font-medium min-h-[100px] outline-none border focus:border-primary"
+                  onChange={e => setNewClient({ ...newClient, notes: e.target.value })}
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] font-medium text-slate-700 placeholder:text-slate-400 min-h-[72px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/8 transition-all resize-none"
                 />
               </div>
             </div>
 
-            <DialogFooter className="p-8 bg-slate-50 border-t border-slate-100 flex-row gap-4">
-              <Button 
-                variant="outline" 
-                onClick={() => setIsAddOpen(false)}
-                className="flex-1 rounded-xl py-6 font-bold border-slate-200"
-              >
+            <div className="px-7 py-4 bg-slate-50/60 border-t border-slate-100 flex items-center justify-end gap-2">
+              <Button variant="ghost" onClick={() => setIsAddOpen(false)}
+                className="h-9 px-5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100">
                 Cancel
               </Button>
-              <Button 
-                onClick={handleAddClient}
-                disabled={submitting}
-                className="flex-[2] bg-primary hover:bg-primary/90 text-white rounded-xl py-6 font-bold shadow-lg shadow-primary/20"
-              >
-                {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Create Organization'}
+              <Button onClick={handleAddClient} disabled={submitting}
+                className="h-9 px-6 rounded-lg bg-primary text-white text-[13px] font-semibold shadow-sm">
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add Client'}
               </Button>
-            </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Search and Filters */}
-      <div className="relative group max-w-2xl">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 transition-colors group-focus-within:text-primary" />
-        <Input 
-          placeholder="Search by name or type..." 
+      {/* ── Search ── */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+        <Input
+          placeholder="Search clients…"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-12 py-6 rounded-xl border-slate-200 bg-white/50 backdrop-blur-sm focus:ring-primary/20 shadow-sm transition-all focus:bg-white"
+          onChange={e => setSearchQuery(e.target.value)}
+          className="pl-9 h-9 rounded-lg border-slate-200 bg-white text-[13px] font-medium placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-slate-300 shadow-sm"
         />
       </div>
 
-      {/* Clients Grid */}
+      {/* ── Content ── */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-10 w-10 text-primary animate-spin" />
+        <div className="flex items-center justify-center py-32">
+          <Loader2 className="h-7 w-7 text-primary/30 animate-spin" />
         </div>
       ) : filteredClients.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <AnimatePresence>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <AnimatePresence mode="popLayout">
             {filteredClients.map((client, index) => (
               <motion.div
                 key={client.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                transition={{ duration: 0.2, delay: index * 0.04 }}
               >
-                <Card className="group rounded-2xl border-slate-100 overflow-hidden hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-300 border hover:border-primary/20">
-                  <CardContent className="p-0">
-                    <div className="p-6 bg-white relative overflow-hidden">
-                      <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteClient(client.id)} className="text-slate-300 hover:text-red-500 rounded-full h-8 w-8">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                <div className="group bg-white rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-md hover:shadow-slate-100 transition-all duration-200 overflow-hidden">
+
+                  {/* Card body */}
+                  <div className="p-5">
+                    {/* Top row */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="h-10 w-10 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/8 transition-colors">
+                        <Building2 className="h-4.5 w-4.5 text-slate-500 group-hover:text-primary transition-colors" style={{ height: '18px', width: '18px' }} />
                       </div>
-                      
-                      <div className="h-12 w-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-500">
-                        <Building2 className="h-6 w-6" />
+                      <button
+                        onClick={() => handleDeleteClient(client.id)}
+                        className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Name + type */}
+                    <div className="mb-4">
+                      <h3 className="text-[14.5px] font-semibold text-slate-900 leading-tight mb-1.5 truncate">{client.name}</h3>
+                      <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10.5px] font-medium">
+                        {client.business_type || 'Private Entity'}
+                      </span>
+                    </div>
+
+                    {/* Stats row */}
+                    <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100 mb-4">
+                      <div>
+                        <p className="text-[9.5px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Value</p>
+                        <p className="text-[13px] font-semibold text-slate-800">₹0.00</p>
                       </div>
-                      
-                      <h3 className="text-lg font-bold text-slate-900 mb-1 truncate">{client.name}</h3>
-                      <div className="flex items-center gap-2 text-[13px] text-slate-500 font-medium mb-4">
-                        <span className="px-2 py-0.5 bg-slate-100 rounded-md text-[9px] uppercase tracking-wider font-black">{client.business_type || 'General'}</span>
-                        <span className="h-1 w-1 rounded-full bg-slate-300" />
-                        <span>{client.currency}</span>
+                      <div className="text-right">
+                        <p className="text-[9.5px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Due</p>
+                        <p className="text-[13px] font-semibold text-rose-500">₹0.00</p>
                       </div>
-                      
-                      <div className="space-y-2 pt-4 border-t border-slate-50">
-                        <div className="flex items-center gap-2 text-[13px] text-slate-600">
-                          <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                          <span>{client.country}</span>
+                    </div>
+
+                    {/* Meta */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
+                        <span className="text-[12px] text-slate-500 font-medium truncate">{client.country || 'Not specified'}</span>
+                      </div>
+                      {client.notes && (
+                        <div className="flex items-start gap-2">
+                          <FileText className="h-3.5 w-3.5 text-slate-300 flex-shrink-0 mt-0.5" />
+                          <span className="text-[12px] text-slate-400 font-medium line-clamp-2 leading-snug">{client.notes}</span>
                         </div>
-                        {client.notes && (
-                          <div className="flex items-start gap-2 text-[13px] text-slate-600">
-                            <FileText className="h-3.5 w-3.5 text-slate-400 mt-0.5" />
-                            <p className="line-clamp-1">{client.notes}</p>
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
-                    
-                    <div className="px-6 py-4 bg-slate-50 flex items-center justify-between border-t border-slate-100">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Active Accounts</span>
-                      <Button variant="ghost" size="sm" className="h-8 text-primary font-bold hover:bg-white rounded-lg text-xs">
-                        View Details
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-5 py-3 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 font-medium">{client.currency || 'INR'}</span>
+                    <button className="text-[11.5px] font-medium text-slate-500 hover:text-primary transition-colors">
+                      View Details →
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             ))}
           </AnimatePresence>
         </div>
       ) : (
-        <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-slate-100">
-          <div className="h-20 w-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Building2 className="h-10 w-10 text-slate-300" />
+        <div className="text-center py-28 bg-slate-50/40 rounded-2xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center">
+          <div className="h-14 w-14 bg-white rounded-2xl border border-slate-100 shadow-sm flex items-center justify-center mb-5">
+            <Building2 className="h-6 w-6 text-slate-200" />
           </div>
-          <h3 className="text-xl font-bold text-slate-900 mb-2">No organizations found</h3>
-          <p className="text-slate-500 mb-8 max-w-sm mx-auto">Create your first client to start organizing separate ledgers and accounts.</p>
-          <Button onClick={() => setIsAddOpen(true)} className="bg-primary hover:bg-primary/90 text-white px-8 py-6 rounded-xl font-bold transition-all hover:scale-105">
-            Add Your First Client
+          <h3 className="text-[17px] font-bold text-slate-800 mb-1.5">No clients yet</h3>
+          <p className="text-[13px] text-slate-400 mb-7 max-w-xs mx-auto leading-relaxed">
+            Add your first client to start organizing accounts and transactions by business entity.
+          </p>
+          <Button onClick={() => setIsAddOpen(true)}
+            className="bg-slate-900 hover:bg-black text-white px-7 h-10 rounded-xl text-[13px] font-semibold shadow-sm">
+            Add First Client
           </Button>
         </div>
       )}

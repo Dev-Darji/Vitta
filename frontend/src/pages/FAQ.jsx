@@ -121,7 +121,7 @@ const FAQ = () => {
                         {faqCategories.map((category, catIndex) => (
                             <motion.div key={catIndex} variants={itemVariants} className="space-y-6">
                                 <div className="flex items-center gap-4 mb-2">
-                                    <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg">
+                                    <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center shadow-lg">
                                         {category.icon}
                                     </div>
                                     <h2 className="font-heading font-extrabold text-2xl text-primary uppercase tracking-tight">{category.title}</h2>
@@ -165,13 +165,13 @@ const FAQ = () => {
                             
                             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                                 <Link to="/contact">
-                                    <Button className="w-full sm:w-auto min-w-[200px] h-16 rounded-2xl bg-accent hover:bg-accent/90 text-primary font-black uppercase tracking-widest shadow-xl transition-all hover:scale-105 active:scale-95 group/btn">
+                                    <Button className="w-full sm:w-auto min-w-[200px] h-16 rounded-lg bg-accent hover:bg-accent/90 text-primary font-black uppercase tracking-widest shadow-xl transition-all hover:scale-105 active:scale-95 group/btn">
                                         Chat with Us
                                         <MessageSquare className="ml-2 w-4 h-4 group-hover/btn:rotate-12 transition-transform" />
                                     </Button>
                                 </Link>
                                 <a href="mailto:support@vitta.in">
-                                    <Button variant="outline" className="w-full sm:w-auto min-w-[200px] h-16 rounded-2xl border-white/20 text-white hover:bg-white hover:text-primary font-black uppercase tracking-widest transition-all">
+                                    <Button variant="outline" className="w-full sm:w-auto min-w-[200px] h-16 rounded-lg border-white/20 text-white hover:bg-white hover:text-primary font-black uppercase tracking-widest transition-all">
                                         Drop an Email
                                         <ArrowRight className="ml-2 w-4 h-4" />
                                     </Button>

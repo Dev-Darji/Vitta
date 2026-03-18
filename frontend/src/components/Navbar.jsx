@@ -73,7 +73,7 @@ export const Navbar = () => {
               <Link to="/" className="group flex items-center space-x-3 w-fit">
                 <motion.div 
                   whileHover={{ rotate: -10, scale: 1.1 }}
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-lg transition-all duration-500 ${
+                  className={`w-9 h-9 rounded-md flex items-center justify-center shadow-lg transition-all duration-500 ${
                     shouldShowSolid ? 'bg-primary shadow-primary/10' : 'bg-accent shadow-accent/20'
                   }`}
                 >
@@ -163,7 +163,7 @@ export const Navbar = () => {
               <motion.button
                 whileTap={{ scale: 0.9 }}
                 onClick={() => setIsOpen(!isOpen)}
-                className={`md:hidden w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-500 ${
+                className={`md:hidden w-9 h-9 flex items-center justify-center rounded-md transition-all duration-500 ${
                   shouldShowSolid ? 'bg-slate-100 text-primary' : 'bg-white/10 text-white backdrop-blur-md'
                 }`}
               >
@@ -209,12 +209,12 @@ export const Navbar = () => {
                 <div className="space-y-4">
                   <motion.div variants={linkVariants} className="grid grid-cols-2 gap-4">
                     <Link to="/login" onClick={() => setIsOpen(false)}>
-                      <Button variant="outline" className="w-full h-16 rounded-2xl border-2 text-primary font-black uppercase tracking-widest text-xs">
+                      <Button variant="outline" className="w-full h-16 rounded-lg border-2 text-primary font-black uppercase tracking-widest text-xs">
                         Login
                       </Button>
                     </Link>
                     <Link to="/signup" onClick={() => setIsOpen(false)}>
-                      <Button className="w-full h-16 rounded-2xl bg-primary text-white font-black uppercase tracking-widest text-xs shadow-2xl shadow-primary/20">
+                      <Button className="w-full h-16 rounded-lg bg-primary text-white font-black uppercase tracking-widest text-xs shadow-2xl shadow-primary/20">
                         Join Now
                       </Button>
                     </Link>

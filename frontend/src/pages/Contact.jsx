@@ -95,7 +95,7 @@ const Contact = () => {
                         >
                             <motion.div variants={itemVariants} className="group p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_20px_40px_-12px_rgba(15,57,43,0.08)] hover:shadow-[0_40px_80px_-24px_rgba(15,57,43,0.12)] transition-all duration-500">
                                 <div className="flex items-center gap-6">
-                                    <div className="w-16 h-16 rounded-2xl bg-[#0F392B] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
+                                    <div className="w-16 h-16 rounded-lg bg-[#0F392B] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
                                         <Mail className="w-8 h-8 text-accent" />
                                     </div>
                                     <div>
@@ -107,7 +107,7 @@ const Contact = () => {
 
                             <motion.div variants={itemVariants} className="group p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_20px_40px_-12px_rgba(15,57,43,0.08)] hover:shadow-[0_40px_80px_-24px_rgba(15,57,43,0.12)] transition-all duration-500">
                                 <div className="flex items-center gap-6">
-                                    <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
+                                    <div className="w-16 h-16 rounded-lg bg-accent flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
                                         <Phone className="w-8 h-8 text-primary" />
                                     </div>
                                     <div>
@@ -119,7 +119,7 @@ const Contact = () => {
 
                             <motion.div variants={itemVariants} className="group p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_20px_40px_-12px_rgba(15,57,43,0.08)] hover:shadow-[0_40px_80px_-24px_rgba(15,57,43,0.12)] transition-all duration-500">
                                 <div className="flex items-center gap-6">
-                                    <div className="w-16 h-16 rounded-2xl bg-[#F0F4F2] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
+                                    <div className="w-16 h-16 rounded-lg bg-[#F0F4F2] flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
                                         <MapPin className="w-8 h-8 text-primary" />
                                     </div>
                                     <div>
@@ -166,7 +166,7 @@ const Contact = () => {
                                             value={formData.name}
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                             placeholder="John Doe"
-                                            className="h-16 rounded-2xl bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
+                                            className="h-16 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
                                         />
                                     </div>
                                     <div className="space-y-3">
@@ -177,7 +177,7 @@ const Contact = () => {
                                             value={formData.email}
                                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                             placeholder="name@company.com"
-                                            className="h-16 rounded-2xl bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
+                                            className="h-16 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
                                         />
                                     </div>
                                 </div>
@@ -189,7 +189,7 @@ const Contact = () => {
                                         value={formData.message}
                                         onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                                         placeholder="How can Vitta help your business today?"
-                                        className="min-h-[200px] rounded-2xl bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 py-5 text-slate-700 placeholder:text-slate-400 resize-none"
+                                        className="min-h-[200px] rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 py-5 text-slate-700 placeholder:text-slate-400 resize-none"
                                     />
                                 </div>
 
@@ -197,7 +197,7 @@ const Contact = () => {
                                     <Button
                                         type="submit"
                                         disabled={loading}
-                                        className="w-full lg:w-auto min-w-[240px] h-16 rounded-2xl bg-gradient-to-r from-primary to-[#16523E] hover:from-primary/95 hover:to-[#16523E]/95 text-white font-black uppercase tracking-widest shadow-[0_20px_40px_-12px_rgba(15,57,43,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98] border-t border-white/10 px-10 group"
+                                        className="w-full lg:w-auto min-w-[240px] h-16 rounded-lg bg-gradient-to-r from-primary to-[#16523E] hover:from-primary/95 hover:to-[#16523E]/95 text-white font-black uppercase tracking-widest shadow-[0_20px_40px_-12px_rgba(15,57,43,0.3)] transition-all hover:scale-[1.02] active:scale-[0.98] border-t border-white/10 px-10 group"
                                     >
                                         {loading ? (
                                             <span className="flex items-center gap-2">

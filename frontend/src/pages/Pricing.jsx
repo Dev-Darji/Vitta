@@ -145,7 +145,7 @@ const Pricing = () => {
                   <p className="text-slate-600 text-sm leading-relaxed font-medium">{plan.description}</p>
                 </div>
 
-                <div className="mb-10 p-6 bg-slate-50/50 rounded-3xl border border-slate-100/50">
+                <div className="mb-10 p-6 bg-slate-50/50 rounded-lg border border-slate-100/50">
                   <div className="flex items-baseline gap-2">
                     <span className="text-5xl font-black text-primary tracking-tighter transition-all">
                       ₹{billingPeriod === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice}
@@ -177,7 +177,7 @@ const Pricing = () => {
                 <Link to="/signup" className="mt-auto">
                   <Button
                     size="lg"
-                    className={`w-full rounded-2xl py-9 text-lg font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 active:scale-95 shadow-2xl ${
+                    className={`w-full rounded-lg py-9 text-lg font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 active:scale-95 shadow-2xl ${
                       plan.popular
                         ? 'bg-primary hover:bg-primary/95 text-white shadow-primary/20'
                         : 'bg-slate-100 hover:bg-slate-200 text-slate-800 shadow-transparent hover:shadow-slate-200/50'
@@ -199,7 +199,7 @@ const Pricing = () => {
               { title: 'Gst Invoicing', desc: 'Download GST-ready bills', icon: Star }
             ].map((box, i) => (
               <div key={i} className="flex items-center gap-5 px-8">
-                <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-primary group hover:bg-primary hover:text-white transition-all">
+                <div className="w-12 h-12 rounded-lg bg-white shadow-sm flex items-center justify-center text-primary group hover:bg-primary hover:text-white transition-all">
                    <box.icon className="h-6 w-6" />
                 </div>
                 <div>

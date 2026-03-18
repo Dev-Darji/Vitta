@@ -130,7 +130,7 @@ const Landing = () => {
                     
                     <div className="grid grid-cols-3 gap-4 mb-8">
                        {[1,2,3].map(i => (
-                         <div key={i} className="h-20 bg-slate-50 border border-slate-100 rounded-xl p-3">
+                         <div key={i} className="h-20 bg-slate-50 border border-slate-100 rounded-md p-3">
                             <div className="h-3 w-12 bg-slate-200 rounded mb-3" />
                             <div className="h-5 w-16 bg-slate-300 rounded" />
                          </div>
@@ -143,7 +143,7 @@ const Landing = () => {
                         { name: 'Razorpay Payout', price: '₹1,24,000', tag: 'INCOME' },
                         { name: 'Cloud Server', price: '₹8,490', tag: 'EXPENSE' }
                       ].map((row, i) => (
-                        <div key={i} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                        <div key={i} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-lg shadow-sm">
                            <div className="flex items-center gap-3">
                               <div className="w-8 h-8 bg-slate-100 rounded flex items-center justify-center">
                                 <FileCheck className="h-4 w-4 text-slate-400" />
@@ -164,10 +164,10 @@ const Landing = () => {
                 <motion.div 
                    animate={{ y: [0, -10, 0] }}
                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                   className="absolute -top-10 -right-6 bg-accent p-4 rounded-2xl shadow-2xl border border-white/20 z-20"
+                   className="absolute -top-10 -right-6 bg-accent p-4 rounded-lg shadow-2xl border border-white/20 z-20"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
+                    <div className="w-10 h-10 bg-primary/20 rounded-md flex items-center justify-center">
                       <BarChart3 className="text-primary h-6 w-6" />
                     </div>
                     <div>
@@ -180,10 +180,10 @@ const Landing = () => {
                 <motion.div 
                    animate={{ y: [0, 10, 0] }}
                    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                   className="absolute bottom-10 -left-12 bg-white p-5 rounded-2xl shadow-2xl border border-slate-100 z-20 flex flex-col gap-3"
+                   className="absolute bottom-10 -left-12 bg-white p-5 rounded-lg shadow-2xl border border-slate-100 z-20 flex flex-col gap-3"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
+                    <div className="w-10 h-10 bg-green-50 rounded-md flex items-center justify-center">
                       <Lock className="text-green-600 h-5 w-5" />
                     </div>
                     <div className="text-xs font-bold text-primary">AES-256 Vault</div>
@@ -272,7 +272,7 @@ const Landing = () => {
                            <div key={i} className="flex-1 bg-white/5 rounded-t hover:bg-accent transition-colors cursor-pointer" style={{ height: `${h}%` }} />
                          ))}
                       </div>
-                      <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between border border-white/5">
+                      <div className="bg-white/5 rounded-lg p-4 flex items-center justify-between border border-white/5">
                          <div className="flex items-center gap-3">
                             <Zap className="text-accent h-5 w-5" />
                             <span className="text-white/80 text-sm font-medium">Ready to File ITR-3?</span>
@@ -302,7 +302,7 @@ const Landing = () => {
                 transition={{ delay: index * 0.1 }}
                 className="bg-white p-10 rounded-[2.5rem] border border-slate-200 hover:shadow-2xl hover:border-accent group transition-all"
               >
-                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-8 shadow-sm group-hover:bg-primary transition-colors">
+                <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center mb-8 shadow-sm group-hover:bg-primary transition-colors">
                   <feature.icon className="h-8 w-8 text-primary group-hover:text-white transition-colors" />
                 </div>
                 <h3 className="font-heading font-bold text-xl text-primary mb-4">
@@ -376,7 +376,7 @@ const Landing = () => {
                     Most Popular
                   </div>
                 )}
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all ${
+                <div className={`w-14 h-14 rounded-lg flex items-center justify-center mb-6 transition-all ${
                   plan.popular ? 'bg-primary text-accent' : 'bg-slate-50 text-slate-400'
                 }`}>
                   <plan.icon className="h-7 w-7" />
@@ -398,7 +398,7 @@ const Landing = () => {
                   ))}
                 </ul>
                 <Link to="/signup">
-                  <Button className={`w-full rounded-2xl py-7 text-lg font-black uppercase tracking-widest transition-all ${
+                  <Button className={`w-full rounded-lg py-7 text-lg font-black uppercase tracking-widest transition-all ${
                     plan.popular ? 'bg-primary text-white hover:bg-primary/95 shadow-xl shadow-primary/10' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}>
                     Select {plan.name}

@@ -89,7 +89,7 @@ const ImportStatement = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm"
+        className="bg-white rounded-md border border-slate-200 p-8 shadow-sm"
       >
         <div className="mb-6">
           <h2 className="font-heading font-bold text-2xl text-primary mb-2">Import Bank Statement</h2>
@@ -130,7 +130,7 @@ const ImportStatement = () => {
           {/* File Upload */}
           <div>
             <Label className="text-sm font-semibold text-slate-700 mb-2 block">Upload CSV or PDF File</Label>
-            <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-primary transition-colors">
+            <div className="border-2 border-dashed border-slate-300 rounded-md p-8 text-center hover:border-primary transition-colors">
               <input
                 data-testid="file-input"
                 id="file-upload"
@@ -174,7 +174,7 @@ const ImportStatement = () => {
             data-testid="upload-button"
             onClick={handleUpload}
             disabled={!file || !selectedAccount || uploading}
-            className="w-full bg-primary hover:bg-primary/90 text-white py-6 text-lg font-semibold rounded-xl"
+            className="w-full bg-primary hover:bg-primary/90 text-white py-6 text-lg font-semibold rounded-md"
           >
             {uploading ? 'Uploading...' : 'Upload & Import'}
           </Button>

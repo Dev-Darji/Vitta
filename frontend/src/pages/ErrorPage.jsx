@@ -33,7 +33,7 @@ const ErrorPage = () => {
         animate={{ opacity: 1, y: 0 }}
         className="max-w-md w-full text-center"
       >
-        <div className="h-24 w-24 bg-red-100 rounded-[32px] flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-red-200/50">
+        <div className="h-24 w-24 bg-red-100 rounded-lg flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-red-200/50">
           <AlertCircle className="h-12 w-12 text-red-600" />
         </div>
         
@@ -46,7 +46,7 @@ const ErrorPage = () => {
         </p>
 
         {process.env.NODE_ENV === 'development' && (
-          <div className="mb-10 p-4 bg-slate-900 rounded-2xl text-left overflow-hidden border border-slate-800 shadow-xl">
+          <div className="mb-10 p-4 bg-slate-900 rounded-lg text-left overflow-hidden border border-slate-800 shadow-xl">
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 px-1">Developer Debug</p>
             <div className="text-xs font-mono text-slate-300 break-all bg-black/50 p-3 rounded-lg border border-white/5">
               {error?.message || error?.statusText || "Unknown Error"}
@@ -57,7 +57,7 @@ const ErrorPage = () => {
         <div className="space-y-3">
           <Button 
             onClick={() => window.location.reload()} 
-            className="w-full bg-primary hover:bg-primary/90 text-white py-6 rounded-2xl font-bold shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full bg-primary hover:bg-primary/90 text-white py-6 rounded-lg font-bold shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             <RefreshCw className="h-5 w-5 mr-2" />
             Refresh Page
@@ -67,7 +67,7 @@ const ErrorPage = () => {
             <Button 
               variant="outline" 
               onClick={() => navigate(-1)}
-              className="py-6 rounded-2xl border-slate-200 text-slate-600 font-bold hover:bg-white h-auto"
+              className="py-6 rounded-lg border-slate-200 text-slate-600 font-bold hover:bg-white h-auto"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Go Back
@@ -75,7 +75,7 @@ const ErrorPage = () => {
             <Button 
               variant="outline" 
               onClick={() => navigate('/dashboard')}
-              className="py-6 rounded-2xl border-slate-200 text-slate-600 font-bold hover:bg-white h-auto"
+              className="py-6 rounded-lg border-slate-200 text-slate-600 font-bold hover:bg-white h-auto"
             >
               <Home className="h-4 w-4 mr-2" />
               Home

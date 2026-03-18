@@ -7,10 +7,10 @@ import { AlertTriangle, X } from 'lucide-react';
 const ConfirmPopup = ({ open, onClose, onConfirm, title, description, confirmText = 'Discard and Move', cancelText = 'Stay on Page' }) => {
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-0 rounded-[32px] bg-white shadow-2xl">
+      <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-0 rounded-lg bg-white shadow-2xl">
         <div className="p-8">
           <div className="mb-6">
-            <div className="h-14 w-14 bg-amber-50 rounded-2xl flex items-center justify-center border border-amber-100 shadow-sm shadow-amber-50">
+            <div className="h-14 w-14 bg-amber-50 rounded-lg flex items-center justify-center border border-amber-100 shadow-sm shadow-amber-50">
               <AlertTriangle className="h-7 w-7 text-amber-500" />
             </div>
           </div>
@@ -28,14 +28,14 @@ const ConfirmPopup = ({ open, onClose, onConfirm, title, description, confirmTex
             <Button
               variant="outline"
               onClick={onClose}
-              className="flex-1 py-6 rounded-2xl border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-all h-auto order-2 sm:order-1"
+              className="flex-1 py-6 rounded-lg border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-all h-auto order-2 sm:order-1"
             >
               {cancelText}
             </Button>
             <Button
               variant="default"
               onClick={onConfirm}
-              className="flex-1 py-6 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold shadow-lg shadow-red-200 transition-all h-auto order-1 sm:order-2"
+              className="flex-1 py-6 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold shadow-lg shadow-red-200 transition-all h-auto order-1 sm:order-2"
             >
               {confirmText}
             </Button>

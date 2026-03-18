@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { User, Shield, Loader2, Save, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,10 +44,9 @@ const Settings = () => {
 
     try {
       await api.put('/user/profile', profileData);
-      toast.success('Profile updated successfully');
+      toast.success('Profile updated');
       fetchUser();
       
-      // Update localStorage
       const updatedUser = { ...user, ...profileData };
       localStorage.setItem('user', JSON.stringify(updatedUser));
     } catch (error) {
@@ -60,12 +60,12 @@ const Settings = () => {
     e.preventDefault();
 
     if (passwordData.new_password !== passwordData.confirm_password) {
-      toast.error('New passwords do not match');
+      toast.error('Passwords do not match');
       return;
     }
 
     if (passwordData.new_password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+      toast.error('At least 6 characters required');
       return;
     }
 
@@ -76,100 +76,129 @@ const Settings = () => {
         current_password: passwordData.current_password,
         new_password: passwordData.new_password,
       });
-      toast.success('Password updated successfully');
+      toast.success('Password updated');
       setPasswordData({ current_password: '', new_password: '', confirm_password: '' });
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to update password');
+      toast.error(error.response?.data?.detail || 'Update failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div data-testid="settings-page" className="max-w-3xl mx-auto space-y-6">
-      <h2 className="font-heading font-bold text-2xl text-primary">Settings</h2>
+    <div data-testid="settings-page" className="max-w-4xl space-y-6 pb-20">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Settings</h1>
+          <p className="text-slate-500 font-medium text-sm">Manage your account and security preferences.</p>
+        </div>
+      </div>
 
-      {/* Profile Settings */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm"
-      >
-        <h3 className="font-heading font-semibold text-lg text-primary mb-6">Profile Information</h3>
-        <form data-testid="profile-form" onSubmit={handleUpdateProfile} className="space-y-4">
-          <div>
-            <Label className="text-sm font-semibold text-slate-700 mb-2 block">Full Name</Label>
-            <Input
-              data-testid="profile-name-input"
-              value={profileData.name}
-              onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-              required
-            />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Profile Settings */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm"
+        >
+          <div className="flex items-center gap-3 mb-8">
+            <div className="h-10 w-10 bg-primary/5 text-primary rounded-lg flex items-center justify-center">
+              <User className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Profile Identity</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Update your personal details</p>
+            </div>
           </div>
-          <div>
-            <Label className="text-sm font-semibold text-slate-700 mb-2 block">Email</Label>
-            <Input value={user?.email || ''} disabled className="bg-slate-50" />
-            <p className="text-xs text-slate-500 mt-1">Email cannot be changed</p>
-          </div>
-          <div>
-            <Label className="text-sm font-semibold text-slate-700 mb-2 block">Business Name</Label>
-            <Input
-              data-testid="profile-business-input"
-              value={profileData.business_name}
-              onChange={(e) => setProfileData({ ...profileData, business_name: e.target.value })}
-              placeholder="Optional"
-            />
-          </div>
-          <Button data-testid="update-profile-button" type="submit" disabled={loading} className="bg-primary hover:bg-primary/90 text-white">
-            {loading ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </form>
-      </motion.div>
 
-      {/* Password Settings */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm"
-      >
-        <h3 className="font-heading font-semibold text-lg text-primary mb-6">Change Password</h3>
-        <form data-testid="password-form" onSubmit={handleUpdatePassword} className="space-y-4">
-          <div>
-            <Label className="text-sm font-semibold text-slate-700 mb-2 block">Current Password</Label>
-            <Input
-              data-testid="current-password-input"
-              type="password"
-              value={passwordData.current_password}
-              onChange={(e) => setPasswordData({ ...passwordData, current_password: e.target.value })}
-              required
-            />
+          <form data-testid="profile-form" onSubmit={handleUpdateProfile} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Full Name</Label>
+              <Input
+                data-testid="profile-name-input"
+                value={profileData.name}
+                onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                required
+                className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email Address</Label>
+              <Input value={user?.email || ''} disabled className="bg-slate-100/50 text-slate-400 border-none h-10 font-bold text-xs cursor-not-allowed" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Business Name</Label>
+              <Input
+                data-testid="profile-business-input"
+                value={profileData.business_name}
+                onChange={(e) => setProfileData({ ...profileData, business_name: e.target.value })}
+                placeholder="Tax ID or Business Title"
+                className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs"
+              />
+            </div>
+            <Button data-testid="update-profile-button" type="submit" disabled={loading} className="w-full h-10 rounded-lg bg-slate-900 hover:bg-black text-white font-bold text-xs shadow-md mt-4">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Profile Changes'}
+            </Button>
+          </form>
+        </motion.div>
+
+        {/* Password Settings */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm"
+        >
+          <div className="flex items-center gap-3 mb-8">
+            <div className="h-10 w-10 bg-rose-50 text-rose-500 rounded-lg flex items-center justify-center">
+              <Shield className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Security</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Reset your access password</p>
+            </div>
           </div>
-          <div>
-            <Label className="text-sm font-semibold text-slate-700 mb-2 block">New Password</Label>
-            <Input
-              data-testid="new-password-input"
-              type="password"
-              value={passwordData.new_password}
-              onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <Label className="text-sm font-semibold text-slate-700 mb-2 block">Confirm New Password</Label>
-            <Input
-              data-testid="confirm-password-input"
-              type="password"
-              value={passwordData.confirm_password}
-              onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
-              required
-            />
-          </div>
-          <Button data-testid="update-password-button" type="submit" disabled={loading} className="bg-primary hover:bg-primary/90 text-white">
-            {loading ? 'Updating...' : 'Update Password'}
-          </Button>
-        </form>
-      </motion.div>
+
+          <form data-testid="password-form" onSubmit={handleUpdatePassword} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Current Password</Label>
+              <Input
+                data-testid="current-password-input"
+                type="password"
+                value={passwordData.current_password}
+                onChange={(e) => setPasswordData({ ...passwordData, current_password: e.target.value })}
+                required
+                className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">New Password</Label>
+              <Input
+                data-testid="new-password-input"
+                type="password"
+                value={passwordData.new_password}
+                onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
+                required
+                className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Confirm New Password</Label>
+              <Input
+                data-testid="confirm-password-input"
+                type="password"
+                value={passwordData.confirm_password}
+                onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
+                required
+                className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs"
+              />
+            </div>
+            <Button data-testid="update-password-button" type="submit" disabled={loading} className="w-full h-10 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md mt-4">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update Access Keys'}
+            </Button>
+          </form>
+        </motion.div>
+      </div>
     </div>
   );
 };

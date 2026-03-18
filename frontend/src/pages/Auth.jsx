@@ -205,7 +205,7 @@ const AuthPage = () => {
                                             required
                                             value={formData.email}
                                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            className="h-14 rounded-2xl bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
+                                            className="h-14 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
                                             placeholder="name@company.com"
                                         />
                                     </div>
@@ -220,7 +220,7 @@ const AuthPage = () => {
                                                 required
                                                 value={formData.password}
                                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                                className="h-14 rounded-2xl bg-white border-slate-300 focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
+                                                className="h-14 rounded-lg bg-white border-slate-300 focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
                                                 placeholder="••••••••"
                                             />
                                             <button
@@ -237,7 +237,7 @@ const AuthPage = () => {
                                         <Button
                                             type="submit"
                                             disabled={loading}
-                                            className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-[#16523E] hover:from-primary/95 hover:to-[#16523E]/95 text-white font-black uppercase tracking-widest shadow-[0_20px_40px_-12px_rgba(15,57,43,0.25)] transition-all hover:scale-[1.01] active:scale-[0.99] border-t border-white/10"
+                                            className="w-full h-14 rounded-lg bg-gradient-to-r from-primary to-[#16523E] hover:from-primary/95 hover:to-[#16523E]/95 text-white font-black uppercase tracking-widest shadow-[0_20px_40px_-12px_rgba(15,57,43,0.25)] transition-all hover:scale-[1.01] active:scale-[0.99] border-t border-white/10"
                                         >
                                             {loading ? 'Signing In...' : 'Sign In'}
                                         </Button>
@@ -288,7 +288,7 @@ const AuthPage = () => {
                                             required
                                             value={formData.name}
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            className="h-14 rounded-2xl bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
+                                            className="h-14 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
                                             placeholder="John Doe"
                                         />
                                     </div>
@@ -300,7 +300,7 @@ const AuthPage = () => {
                                             required
                                             value={formData.email}
                                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            className="h-14 rounded-2xl bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
+                                            className="h-14 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
                                             placeholder="name@company.com"
                                         />
                                     </div>
@@ -314,7 +314,7 @@ const AuthPage = () => {
                                                     required
                                                     value={formData.password}
                                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                                    className="h-14 rounded-2xl bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
+                                                    className="h-14 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
                                                     placeholder="••••••••"
                                                 />
                                                 <button
@@ -335,7 +335,7 @@ const AuthPage = () => {
                                                     required
                                                     value={formData.confirmPassword}
                                                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                                                    className="h-14 rounded-2xl bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
+                                                    className="h-14 rounded-lg bg-slate-50/80 border-slate-200 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all px-6 text-slate-700 placeholder:text-slate-400"
                                                     placeholder="••••••••"
                                                 />
                                                 <button
@@ -367,7 +367,7 @@ const AuthPage = () => {
                                         <Button
                                             type="submit"
                                             disabled={loading}
-                                            className="w-full h-14 rounded-2xl bg-gradient-to-r from-primary to-[#16523E] hover:from-primary/95 hover:to-[#16523E]/95 text-white font-black uppercase tracking-widest shadow-[0_20px_40px_-12px_rgba(15,57,43,0.25)] transition-all hover:scale-[1.01] active:scale-[0.99] border-t border-white/10"
+                                            className="w-full h-14 rounded-lg bg-gradient-to-r from-primary to-[#16523E] hover:from-primary/95 hover:to-[#16523E]/95 text-white font-black uppercase tracking-widest shadow-[0_20px_40px_-12px_rgba(15,57,43,0.25)] transition-all hover:scale-[1.01] active:scale-[0.99] border-t border-white/10"
                                         >
                                             {loading ? 'Creating...' : 'Create Account'}
                                         </Button>

@@ -87,7 +87,7 @@ const Signup = () => {
             transition={{ duration: 0.5 }}
             className="w-full max-w-md"
           >
-            <div className="bg-white rounded-3xl border border-slate-200 p-10 shadow-2xl shadow-slate-200/50">
+            <div className="bg-white rounded-lg border border-slate-200 p-10 shadow-2xl shadow-slate-200/50">
               <div className="mb-10 text-center lg:text-left">
                 <h1 className="font-heading font-extrabold text-4xl text-primary mb-3">Get Started</h1>
                 <p className="text-slate-500 font-medium">Create your free account in seconds.</p>
@@ -104,7 +104,7 @@ const Signup = () => {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     autoComplete="name"
-                    className="h-12 rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all px-5"
+                    className="h-12 rounded-md bg-slate-50 border-slate-100 focus:bg-white transition-all px-5"
                     placeholder="John Doe"
                   />
                 </div>
@@ -119,7 +119,7 @@ const Signup = () => {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     autoComplete="email"
-                    className="h-12 rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all px-5"
+                    className="h-12 rounded-md bg-slate-50 border-slate-100 focus:bg-white transition-all px-5"
                     placeholder="name@company.com"
                   />
                 </div>
@@ -136,7 +136,7 @@ const Signup = () => {
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         autoComplete="new-password"
-                        className="h-12 rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all px-5"
+                        className="h-12 rounded-md bg-slate-50 border-slate-100 focus:bg-white transition-all px-5"
                         placeholder="••••••••"
                       />
                       <button
@@ -160,7 +160,7 @@ const Signup = () => {
                         value={formData.confirmPassword}
                         onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                         autoComplete="new-password"
-                        className="h-12 rounded-xl bg-slate-50 border-slate-100 focus:bg-white transition-all px-5"
+                        className="h-12 rounded-md bg-slate-50 border-slate-100 focus:bg-white transition-all px-5"
                         placeholder="••••••••"
                       />
                       <button
@@ -196,7 +196,7 @@ const Signup = () => {
                   data-testid="signup-submit-button"
                   type="submit"
                   disabled={loading}
-                  className="w-full h-14 rounded-2xl bg-primary hover:bg-primary/95 text-white font-black uppercase tracking-widest shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  className="w-full h-14 rounded-lg bg-primary hover:bg-primary/95 text-white font-black uppercase tracking-widest shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                 >
                   {loading ? 'Creating Account...' : 'Get Started Free'}
                 </Button>
