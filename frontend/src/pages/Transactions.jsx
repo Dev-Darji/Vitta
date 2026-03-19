@@ -152,19 +152,22 @@ const Transactions = () => {
   const getCategoryName = (id) => categories.find(c => c.id === id)?.name ?? 'Uncategorized';
 
   const parseDate = (dateStr) => {
-    if (!dateStr) return new Date();
+    if (!dateStr) return null;
+    if (dateStr instanceof Date) return dateStr;
+    
     if (typeof dateStr === 'string' && dateStr.includes('-')) {
       const parts = dateStr.split('-');
-      if (parts[0].length <= 2) {
+      if (parts.length === 3 && parts[0].length <= 2) {
         let [day, month, year] = parts;
         const monthMap = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
         if (!isNaN(month)) month = parseInt(month) - 1;
         else month = monthMap[month.toLowerCase().substring(0,3)];
         const d = new Date(year, month, day);
-        if (!isNaN(d)) return d;
+        if (!isNaN(d.getTime())) return d;
       }
     }
-    return new Date(dateStr);
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? null : d;
   };
 
   const formatDisplayDate = (dateStr) => {
@@ -193,27 +196,30 @@ const Transactions = () => {
 
   /* ── Filtering ── */
   const filteredTransactions = transactions.filter(txn => {
-    const matchesSearch = txn.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          txn.ledger_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const sTerm = (searchTerm || "").toLowerCase();
+    const desc = (txn.description || "").toLowerCase();
+    const ledger = (txn.ledger_name || "").toLowerCase();
+    
+    const matchesSearch = !sTerm || desc.includes(sTerm) || ledger.includes(sTerm);
+
     const matchesAccount  = filterAccount === 'all' || txn.account_id === filterAccount;
     const matchesType     = filterType === 'all' ||
                             (filterType === 'debit' && txn.type === 'debit') ||
                             (filterType === 'credit' && (txn.type === 'credit' || txn.type === 'opening'));
     const matchesCategory = filterCategory === 'all' || txn.category_id === filterCategory;
-    const txnDate  = parseDate(txn.date);
-    const fromDate = dateRange?.from;
-    const toDate   = dateRange?.to;
     
+    const txnDate = parseDate(txn.date);
     let isWithinDateRange = true;
-    if (fromDate) {
-      const dFrom = new Date(fromDate);
+    
+    if (dateRange?.from) {
+      const dFrom = new Date(dateRange.from);
       dFrom.setHours(0,0,0,0);
-      isWithinDateRange = isWithinDateRange && txnDate >= dFrom;
+      isWithinDateRange = isWithinDateRange && (!txnDate || txnDate >= dFrom);
     }
-    if (toDate) {
-      const dTo = new Date(toDate);
+    if (dateRange?.to) {
+      const dTo = new Date(dateRange.to);
       dTo.setHours(23,59,59,999);
-      isWithinDateRange = isWithinDateRange && txnDate <= dTo;
+      isWithinDateRange = isWithinDateRange && (!txnDate || txnDate <= dTo);
     }
     
     return matchesSearch && matchesAccount && matchesType && matchesCategory && isWithinDateRange;

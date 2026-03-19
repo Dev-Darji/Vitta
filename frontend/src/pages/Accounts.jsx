@@ -42,6 +42,92 @@ const typeConfig = {
   Card: { icon: CreditCard, bg: 'bg-rose-50',    text: 'text-rose-500',    border: 'border-rose-100' },
 };
 
+/* ─── Dialog Form Fields (shared between create/edit) ─── */
+const AccountFormFields = ({ data, onChange, isEdit = false, clients = [] }) => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-2 gap-4">
+      {!isEdit && (
+        <div>
+          <FieldLabel>Linked Client</FieldLabel>
+          <Select value={data.client_id} onValueChange={(val) => onChange({ client_id: val })}>
+            <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-slate-100">
+              {clients.map(c => (
+                <SelectItem key={c.id} value={c.id} className="text-[13px]">
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      <div className={!isEdit ? '' : 'col-span-2'}>
+        <FieldLabel>Account Name</FieldLabel>
+        <Input
+          placeholder="e.g. HDFC Salary"
+          value={data.account_name}
+          onChange={e => onChange({ account_name: e.target.value })}
+          required
+          className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
+        />
+      </div>
+    </div>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <FieldLabel>Account Type</FieldLabel>
+        <Select value={data.account_type} onValueChange={(val) => onChange({ account_type: val })}>
+          <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="rounded-xl border-slate-100">
+            <SelectItem value="Bank" className="text-[13px]">Bank Account</SelectItem>
+            <SelectItem value="Cash" className="text-[13px]">Cash in Hand</SelectItem>
+            <SelectItem value="Card" className="text-[13px]">Credit Card</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <FieldLabel>Currency</FieldLabel>
+        <Select value={data.currency} onValueChange={(val) => onChange({ currency: val })}>
+          <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="rounded-xl border-slate-100">
+            <SelectItem value="INR" className="text-[13px]">INR (₹)</SelectItem>
+            <SelectItem value="USD" className="text-[13px]">USD ($)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <FieldLabel>Opening Balance</FieldLabel>
+        <Input
+          type="number"
+          value={data.opening_balance}
+          onChange={e => onChange({ opening_balance: parseFloat(e.target.value) || 0 })}
+          required
+          className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px]"
+        />
+      </div>
+      <div>
+        <FieldLabel>As of Date</FieldLabel>
+        <Input
+          type="date"
+          value={data.opening_balance_date}
+          onChange={e => onChange({ opening_balance_date: e.target.value })}
+          required
+          className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
+        />
+      </div>
+    </div>
+  </div>
+);
+
 /* ─── Account Card ───────────────────────────────────────────────────────── */
 const AccountCard = ({ account, cfg, Icon, index, getClientName, onEdit, onDelete }) => {
   const [expanded, setExpanded] = useState(false);
@@ -282,88 +368,6 @@ const Accounts = () => {
 
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
 
-  /* ─── Dialog Form Fields (shared between create/edit) ─── */
-  const AccountFormFields = ({ data, onChange, isEdit = false }) => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        {!isEdit && (
-          <div>
-            <FieldLabel>Linked Client</FieldLabel>
-            <Select value={data.client_id} onValueChange={(val) => onChange({ client_id: val })}>
-              <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-slate-100">
-                {clients.map(c => <SelectItem key={c.id} value={c.id} className="text-[13px]">{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        <div className={!isEdit ? '' : 'col-span-2'}>
-          <FieldLabel>Account Name</FieldLabel>
-          <Input
-            placeholder="e.g. HDFC Salary"
-            value={data.account_name}
-            onChange={e => onChange({ account_name: e.target.value })}
-            required
-            className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <FieldLabel>Account Type</FieldLabel>
-          <Select value={data.account_type} onValueChange={(val) => onChange({ account_type: val })}>
-            <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl border-slate-100">
-              <SelectItem value="Bank" className="text-[13px]">Bank Account</SelectItem>
-              <SelectItem value="Cash" className="text-[13px]">Cash in Hand</SelectItem>
-              <SelectItem value="Card" className="text-[13px]">Credit Card</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <FieldLabel>Currency</FieldLabel>
-          <Select value={data.currency} onValueChange={(val) => onChange({ currency: val })}>
-            <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl border-slate-100">
-              <SelectItem value="INR" className="text-[13px]">INR (₹)</SelectItem>
-              <SelectItem value="USD" className="text-[13px]">USD ($)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <FieldLabel>Opening Balance</FieldLabel>
-          <Input
-            type="number"
-            value={data.opening_balance}
-            onChange={e => onChange({ opening_balance: parseFloat(e.target.value) || 0 })}
-            required
-            className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px]"
-          />
-        </div>
-        <div>
-          <FieldLabel>As of Date</FieldLabel>
-          <Input
-            type="date"
-            value={data.opening_balance_date}
-            onChange={e => onChange({ opening_balance_date: e.target.value })}
-            required
-            className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
-          />
-        </div>
-      </div>
-    </div>
-  );
-
   /* ─────────────────────── RENDER ─────────────────────── */
   return (
     <div data-accounts-root className="space-y-7 pb-20">
@@ -398,6 +402,7 @@ const Accounts = () => {
               <AccountFormFields
                 data={newAccount}
                 onChange={(patch) => setNewAccount(prev => ({ ...prev, ...patch }))}
+                clients={clients}
               />
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} className="h-9 px-5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100">
@@ -508,6 +513,7 @@ const Accounts = () => {
                 data={editingAccount}
                 onChange={(patch) => setEditingAccount(prev => ({ ...prev, ...patch }))}
                 isEdit
+                clients={clients}
               />
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)} className="h-9 px-5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100">

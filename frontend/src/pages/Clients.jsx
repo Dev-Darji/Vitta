@@ -114,7 +114,7 @@ const Clients = () => {
                 <Input
                   placeholder="e.g. ABC Traders Pvt Ltd"
                   value={newClient.name}
-                  onChange={e => setNewClient({ ...newClient, name: e.target.value })}
+                  onChange={e => setNewClient(prev => ({ ...prev, name: e.target.value }))}
                   className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
                 />
               </div>
@@ -125,13 +125,13 @@ const Clients = () => {
                   <Input
                     placeholder="e.g. Retail"
                     value={newClient.business_type}
-                    onChange={e => setNewClient({ ...newClient, business_type: e.target.value })}
+                    onChange={e => setNewClient(prev => ({ ...prev, business_type: e.target.value }))}
                     className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
                   />
                 </div>
                 <div>
                   <FieldLabel>Currency</FieldLabel>
-                  <Select value={newClient.currency} onValueChange={v => setNewClient({ ...newClient, currency: v })}>
+                  <Select value={newClient.currency} onValueChange={v => setNewClient(prev => ({ ...prev, currency: v }))}>
                     <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
                       <SelectValue />
                     </SelectTrigger>
@@ -149,7 +149,7 @@ const Clients = () => {
                 <Input
                   placeholder="India"
                   value={newClient.country}
-                  onChange={e => setNewClient({ ...newClient, country: e.target.value })}
+                  onChange={e => setNewClient(prev => ({ ...prev, country: e.target.value }))}
                   className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
                 />
               </div>
@@ -159,7 +159,7 @@ const Clients = () => {
                 <textarea
                   placeholder="Additional details..."
                   value={newClient.notes}
-                  onChange={e => setNewClient({ ...newClient, notes: e.target.value })}
+                  onChange={e => setNewClient(prev => ({ ...prev, notes: e.target.value }))}
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] font-medium text-slate-700 placeholder:text-slate-400 min-h-[72px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/8 transition-all resize-none"
                 />
               </div>

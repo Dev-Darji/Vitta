@@ -841,7 +841,7 @@ const AddTransactions = () => {
                           <div className="flex gap-2 p-1 bg-white rounded-lg border border-slate-200 h-10">
                             <button
                               type="button"
-                              onClick={() => setManualForm({ ...manualForm, type: 'debit' })}
+                              onClick={() => setManualForm(p => ({ ...p, type: 'debit' }))}
                               className={`flex-1 flex items-center justify-center gap-1.5 rounded-md text-[12px] font-semibold transition-all
                                 ${manualForm.type === 'debit'
                                   ? 'bg-rose-50 text-rose-600 border border-rose-100 shadow-sm'
@@ -851,7 +851,7 @@ const AddTransactions = () => {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setManualForm({ ...manualForm, type: 'credit' })}
+                              onClick={() => setManualForm(p => ({ ...p, type: 'credit' }))}
                               className={`flex-1 flex items-center justify-center gap-1.5 rounded-md text-[12px] font-semibold transition-all
                                 ${manualForm.type === 'credit'
                                   ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm'
@@ -870,7 +870,7 @@ const AddTransactions = () => {
                               type="number"
                               placeholder="0.00"
                               value={manualForm.amount}
-                              onChange={(e) => setManualForm({ ...manualForm, amount: e.target.value })}
+                              onChange={(e) => setManualForm(p => ({ ...p, amount: e.target.value }))}
                               className={`h-10 pl-7 text-[15px] font-semibold text-slate-900 rounded-lg border-slate-200 focus-visible:ring-1 ${manualErrors.amount ? 'border-rose-300' : ''}`}
                             />
                           </div>
@@ -913,7 +913,7 @@ const AddTransactions = () => {
                           <Input
                             placeholder="e.g. Sales A/c, Rent A/c"
                             value={manualForm.ledger_name}
-                            onChange={(e) => setManualForm({ ...manualForm, ledger_name: e.target.value })}
+                            onChange={(e) => setManualForm(p => ({ ...p, ledger_name: e.target.value }))}
                             className="h-10 rounded-lg border-slate-200 text-[13px] font-medium"
                           />
                         </div>
@@ -923,7 +923,7 @@ const AddTransactions = () => {
                           <Input
                             placeholder="#"
                             value={manualForm.reference_number || manualForm.cheque_number}
-                            onChange={(e) => setManualForm({ ...manualForm, reference_number: e.target.value })}
+                            onChange={(e) => setManualForm(p => ({ ...p, reference_number: e.target.value }))}
                             className="h-10 rounded-lg border-slate-200 text-[13px] uppercase"
                           />
                         </div>
@@ -936,7 +936,7 @@ const AddTransactions = () => {
                           <textarea
                             placeholder="Contextual notes for reconciliation..."
                             value={manualForm.notes}
-                            onChange={(e) => setManualForm({ ...manualForm, notes: e.target.value })}
+                            onChange={(e) => setManualForm(p => ({ ...p, notes: e.target.value }))}
                             className="w-full h-20 px-4 py-3 rounded-lg border border-slate-200 bg-white focus:border-primary focus:ring-2 focus:ring-primary/8 outline-none transition-all text-[13px] font-medium text-slate-700 placeholder:text-slate-400 resize-none"
                           />
                         </div>
