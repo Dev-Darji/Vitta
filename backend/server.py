@@ -285,6 +285,7 @@ header_keywords = {
     "Account Holder Name": ["account holder name", "account holder", "customer name", "beneficiary name", "name"],
     "Cheque Number": ["cheque number", "cheque no", "chq no", "cheque #", "chq number"],
     "Reference": ["reference", "ref no", "reference no", "reference number", "chq/ref no"],
+    "Notes": ["notes", "note", "remarks", "memo", "comment", "comments"],
     "Branch": ["branch", "branch name"]
 }
 
