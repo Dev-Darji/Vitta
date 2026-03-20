@@ -195,6 +195,14 @@ const Transactions = () => {
   };
 
   /* ── Filtering ── */
+  // Get the selected account's name for matching against ledger_name
+  const selectedAccountName = filterAccount !== 'all'
+    ? accounts.find(a => a.id === filterAccount)?.account_name?.toLowerCase() ?? ''
+    : '';
+
+  // Build a set of known account names for smart filtering
+  const knownAccountNames = new Set(accounts.map(a => a.account_name?.toLowerCase()).filter(Boolean));
+
   const filteredTransactions = transactions.filter(txn => {
     const sTerm = (searchTerm || "").toLowerCase();
     const desc = (txn.description || "").toLowerCase();
@@ -202,7 +210,20 @@ const Transactions = () => {
     
     const matchesSearch = !sTerm || desc.includes(sTerm) || ledger.includes(sTerm);
 
-    const matchesAccount  = filterAccount === 'all' || txn.account_id === filterAccount;
+    // Smart account matching:
+    // 1. If the transaction has a ledger_name that matches a known account → filter by ledger_name
+    // 2. If no ledger_name or ledger doesn't match any known account → fall back to account_id
+    let matchesAccount = filterAccount === 'all';
+    if (!matchesAccount) {
+      const hasKnownLedger = txn.ledger_name && knownAccountNames.has(ledger);
+      if (hasKnownLedger) {
+        // Transaction has a recognized ledger → match only by ledger name
+        matchesAccount = ledger === selectedAccountName;
+      } else {
+        // No ledger or unknown ledger (e.g. Opening Balance) → match by account_id
+        matchesAccount = String(txn.account_id) === String(filterAccount);
+      }
+    }
     const matchesType     = filterType === 'all' ||
                             (filterType === 'debit' && txn.type === 'debit') ||
                             (filterType === 'credit' && (txn.type === 'credit' || txn.type === 'opening'));
