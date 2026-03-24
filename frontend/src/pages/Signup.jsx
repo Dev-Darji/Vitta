@@ -366,7 +366,7 @@ const Signup = () => {
               <Link
                 to="/login"
                 tabIndex={loading ? -1 : 0}
-                className="text-[#0B2B1C] font-semibold hover:opacity-70 transition-opacity"
+                className={`text-[#0B2B1C] font-semibold hover:opacity-70 transition-opacity ${loading ? 'opacity-50 pointer-events-none' : ''}`}
               >
                 Sign in here
               </Link>

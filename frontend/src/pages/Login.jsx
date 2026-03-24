@@ -161,7 +161,7 @@ const Login = () => {
               <FieldWrapper
                 label="Password"
                 error={errors.password}
-                hint={<Link to="/forgot-password" tabIndex={loading ? -1 : 0} className="text-[10px] text-slate-400 hover:text-[#0B2B1C] transition-colors font-medium">Forgot password?</Link>}
+                hint={<Link to="/forgot-password" tabIndex={loading ? -1 : 0} className={`text-[10px] text-slate-400 hover:text-[#0B2B1C] transition-colors font-medium ${loading ? 'opacity-50 pointer-events-none' : ''}`}>Forgot password?</Link>}
               >
                 <PasswordInput
                   id="password"
@@ -200,7 +200,7 @@ const Login = () => {
               <Link
                 to="/signup"
                 tabIndex={loading ? -1 : 0}
-                className="text-[#0B2B1C] font-semibold hover:opacity-70 transition-opacity"
+                className={`text-[#0B2B1C] font-semibold hover:opacity-70 transition-opacity ${loading ? 'opacity-50 pointer-events-none' : ''}`}
               >
                 Create a free account
               </Link>

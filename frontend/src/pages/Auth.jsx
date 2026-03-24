@@ -57,7 +57,7 @@ const AuthPage = () => {
     finally { setLoading(false); }
   };
 
-  const inputCls = "h-12 rounded-xl bg-[#F6F6F3] border-slate-200 focus:bg-white focus:border-[#0B2B1C]/20 focus:ring-2 focus:ring-[#0B2B1C]/5 transition-all px-4 text-slate-700 placeholder:text-slate-300 text-[13px]";
+  const inputCls = "h-12 rounded-xl bg-[#F6F6F3] border-slate-200 focus:bg-white focus:border-[#0B2B1C]/20 focus:ring-2 focus:ring-[#0B2B1C]/5 transition-all px-4 text-slate-700 placeholder:text-slate-300 text-[13px] disabled:opacity-50 disabled:cursor-not-allowed";
   const labelCls = "text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1.5 block";
 
   return (
@@ -135,15 +135,15 @@ const AuthPage = () => {
                   <p className="text-slate-400 text-[13px]">Access your financial headquarters.</p>
                 </div>
                 <form onSubmit={handleLogin} className="space-y-4">
-                  <div><Label className={labelCls}>Email address</Label><Input type="email" required value={formData.email} onChange={e=>setFormData({...formData,email:e.target.value})} className={inputCls} placeholder="name@company.com" /></div>
+                  <div><Label className={labelCls}>Email address</Label><Input type="email" required disabled={loading} value={formData.email} onChange={e=>setFormData({...formData,email:e.target.value})} className={inputCls} placeholder="name@company.com" /></div>
                   <div>
                     <div className="flex justify-between items-center mb-1.5">
                       <Label className={labelCls} style={{marginBottom:0}}>Password</Label>
-                      <Link to="/forgot-password" className="text-[9px] text-slate-400 hover:text-[#0B2B1C] transition-colors font-medium">Forgot?</Link>
+                      <Link to="/forgot-password" tabIndex={loading ? -1 : 0} className={`text-[9px] text-slate-400 hover:text-[#0B2B1C] transition-colors font-medium ${loading ? 'opacity-50 pointer-events-none' : ''}`}>Forgot?</Link>
                     </div>
                     <div className="relative">
-                      <Input type={showPassword?'text':'password'} required value={formData.password} onChange={e=>setFormData({...formData,password:e.target.value})} className={inputCls} placeholder="••••••••" />
-                      <button type="button" onClick={()=>setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">{showPassword?<EyeOff className="h-4 w-4"/>:<Eye className="h-4 w-4"/>}</button>
+                      <Input type={showPassword?'text':'password'} required disabled={loading} value={formData.password} onChange={e=>setFormData({...formData,password:e.target.value})} className={inputCls} placeholder="••••••••" />
+                      <button type="button" disabled={loading} onClick={()=>setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors disabled:opacity-50 disabled:pointer-events-none">{showPassword?<EyeOff className="h-4 w-4"/>:<Eye className="h-4 w-4"/>}</button>
                     </div>
                   </div>
                   <Button type="submit" disabled={loading} className="w-full h-11 bg-[#0B2B1C] hover:bg-[#0B2B1C]/90 text-white rounded-xl font-semibold text-[13px] shadow-md shadow-[#0B2B1C]/15 transition-all gap-2 mt-1">
@@ -151,7 +151,7 @@ const AuthPage = () => {
                   </Button>
                 </form>
                 <p className="mt-6 pt-5 border-t border-slate-50 text-[13px] text-slate-400 text-center">
-                  New to Vitta?{' '}<button onClick={handleToggle} className="text-[#0B2B1C] font-semibold hover:opacity-70 transition-opacity">Create a free account</button>
+                  New to Vitta?{' '}<button onClick={handleToggle} disabled={loading} className="text-[#0B2B1C] font-semibold hover:opacity-70 transition-opacity disabled:opacity-50 disabled:pointer-events-none">Create a free account</button>
                 </p>
               </div>
             </motion.div>
@@ -170,21 +170,21 @@ const AuthPage = () => {
                   <p className="text-slate-400 text-[13px]">Join 2,000+ businesses growing with Vitta.</p>
                 </div>
                 <form onSubmit={handleSignup} className="space-y-3.5">
-                  <div><Label className={labelCls}>Full name</Label><Input type="text" required value={formData.name} onChange={e=>setFormData({...formData,name:e.target.value})} className={inputCls} placeholder="John Doe" /></div>
-                  <div><Label className={labelCls}>Business email</Label><Input type="email" required value={formData.email} onChange={e=>setFormData({...formData,email:e.target.value})} className={inputCls} placeholder="name@company.com" /></div>
+                  <div><Label className={labelCls}>Full name</Label><Input type="text" required disabled={loading} value={formData.name} onChange={e=>setFormData({...formData,name:e.target.value})} className={inputCls} placeholder="John Doe" /></div>
+                  <div><Label className={labelCls}>Business email</Label><Input type="email" required disabled={loading} value={formData.email} onChange={e=>setFormData({...formData,email:e.target.value})} className={inputCls} placeholder="name@company.com" /></div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className={labelCls}>Password</Label>
-                      <div className="relative"><Input type={showPassword?'text':'password'} required value={formData.password} onChange={e=>setFormData({...formData,password:e.target.value})} className={inputCls} placeholder="••••••••" /><button type="button" onClick={()=>setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">{showPassword?<EyeOff className="h-3.5 w-3.5"/>:<Eye className="h-3.5 w-3.5"/>}</button></div>
+                      <div className="relative"><Input type={showPassword?'text':'password'} required disabled={loading} value={formData.password} onChange={e=>setFormData({...formData,password:e.target.value})} className={inputCls} placeholder="••••••••" /><button type="button" disabled={loading} onClick={()=>setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors disabled:opacity-50 disabled:pointer-events-none">{showPassword?<EyeOff className="h-3.5 w-3.5"/>:<Eye className="h-3.5 w-3.5"/>}</button></div>
                     </div>
                     <div>
                       <Label className={labelCls}>Confirm</Label>
-                      <div className="relative"><Input type={showConfirm?'text':'password'} required value={formData.confirmPassword} onChange={e=>setFormData({...formData,confirmPassword:e.target.value})} className={inputCls} placeholder="••••••••" /><button type="button" onClick={()=>setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">{showConfirm?<EyeOff className="h-3.5 w-3.5"/>:<Eye className="h-3.5 w-3.5"/>}</button></div>
+                      <div className="relative"><Input type={showConfirm?'text':'password'} required disabled={loading} value={formData.confirmPassword} onChange={e=>setFormData({...formData,confirmPassword:e.target.value})} className={inputCls} placeholder="••••••••" /><button type="button" disabled={loading} onClick={()=>setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors disabled:opacity-50 disabled:pointer-events-none">{showConfirm?<EyeOff className="h-3.5 w-3.5"/>:<Eye className="h-3.5 w-3.5"/>}</button></div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5 py-1">
-                    <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={setAgreedToTerms} className="mt-0.5 rounded border-slate-300 data-[state=checked]:bg-[#0B2B1C] data-[state=checked]:border-[#0B2B1C]" />
-                    <label htmlFor="terms" className="text-[11px] text-slate-400 leading-relaxed cursor-pointer">
+                    <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={setAgreedToTerms} disabled={loading} className="mt-0.5 rounded border-slate-300 data-[state=checked]:bg-[#0B2B1C] data-[state=checked]:border-[#0B2B1C] disabled:opacity-50 disabled:cursor-not-allowed" />
+                    <label htmlFor="terms" className={`text-[11px] leading-relaxed cursor-pointer select-none ${loading ? 'opacity-50 pointer-events-none' : 'text-slate-400'}`}>
                       I agree to the <a href="#" className="text-[#0B2B1C] hover:underline font-semibold">Terms</a> and <a href="#" className="text-[#0B2B1C] hover:underline font-semibold">Privacy Policy</a>
                     </label>
                   </div>
@@ -193,7 +193,7 @@ const AuthPage = () => {
                   </Button>
                 </form>
                 <p className="mt-5 pt-5 border-t border-slate-50 text-[13px] text-slate-400 text-center">
-                  Already have an account?{' '}<button onClick={handleToggle} className="text-[#0B2B1C] font-semibold hover:opacity-70 transition-opacity">Sign in here</button>
+                  Already have an account?{' '}<button onClick={handleToggle} disabled={loading} className="text-[#0B2B1C] font-semibold hover:opacity-70 transition-opacity disabled:opacity-50 disabled:pointer-events-none">Sign in here</button>
                 </p>
               </div>
             </motion.div>
