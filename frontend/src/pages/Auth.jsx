@@ -134,16 +134,37 @@ const AuthPage = () => {
                   <h1 className="font-sora font-bold text-[28px] text-[#0B2B1C] mb-1.5 tracking-[-0.02em]">Welcome back.</h1>
                   <p className="text-slate-400 text-[13px]">Access your financial headquarters.</p>
                 </div>
-                <form onSubmit={handleLogin} className="space-y-4">
+                <form onSubmit={handleLogin} className={`space-y-4 ${loading ? 'pointer-events-none select-none' : ''}`}>
                   <div><Label className={labelCls}>Email address</Label><Input type="email" required disabled={loading} value={formData.email} onChange={e=>setFormData({...formData,email:e.target.value})} className={inputCls} placeholder="name@company.com" /></div>
-                  <div>
-                    <div className="flex justify-between items-center mb-1.5">
-                      <Label className={labelCls} style={{marginBottom:0}}>Password</Label>
-                      <Link to="/forgot-password" tabIndex={loading ? -1 : 0} className={`text-[9px] text-slate-400 hover:text-[#0B2B1C] transition-colors font-medium ${loading ? 'opacity-50 pointer-events-none' : ''}`}>Forgot?</Link>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <Label className={labelCls} style={{ marginBottom: 0 }}>Password</Label>
+                      <Link
+                        to="/forgot-password"
+                        tabIndex={loading ? -1 : 0}
+                        className={`text-[9px] text-slate-400 hover:text-[#0B2B1C] transition-colors font-medium ${loading ? 'opacity-50 pointer-events-none' : ''}`}
+                      >
+                        Forgot?
+                      </Link>
                     </div>
                     <div className="relative">
-                      <Input type={showPassword?'text':'password'} required disabled={loading} value={formData.password} onChange={e=>setFormData({...formData,password:e.target.value})} className={inputCls} placeholder="••••••••" />
-                      <button type="button" disabled={loading} onClick={()=>setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors disabled:opacity-50 disabled:pointer-events-none">{showPassword?<EyeOff className="h-4 w-4"/>:<Eye className="h-4 w-4"/>}</button>
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        disabled={loading}
+                        value={formData.password}
+                        onChange={e => setFormData({ ...formData, password: e.target.value })}
+                        className={inputCls}
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
                   </div>
                   <Button type="submit" disabled={loading} className="w-full h-11 bg-[#0B2B1C] hover:bg-[#0B2B1C]/90 text-white rounded-xl font-semibold text-[13px] shadow-md shadow-[#0B2B1C]/15 transition-all gap-2 mt-1">
@@ -169,7 +190,7 @@ const AuthPage = () => {
                   <h1 className="font-sora font-bold text-[28px] text-[#0B2B1C] mb-1.5 tracking-[-0.02em]">Get started.</h1>
                   <p className="text-slate-400 text-[13px]">Join 2,000+ businesses growing with Vitta.</p>
                 </div>
-                <form onSubmit={handleSignup} className="space-y-3.5">
+                <form onSubmit={handleSignup} className={`space-y-3.5 ${loading ? 'pointer-events-none select-none' : ''}`}>
                   <div><Label className={labelCls}>Full name</Label><Input type="text" required disabled={loading} value={formData.name} onChange={e=>setFormData({...formData,name:e.target.value})} className={inputCls} placeholder="John Doe" /></div>
                   <div><Label className={labelCls}>Business email</Label><Input type="email" required disabled={loading} value={formData.email} onChange={e=>setFormData({...formData,email:e.target.value})} className={inputCls} placeholder="name@company.com" /></div>
                   <div className="grid grid-cols-2 gap-3">
@@ -185,7 +206,7 @@ const AuthPage = () => {
                   <div className="flex items-start gap-2.5 py-1">
                     <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={setAgreedToTerms} disabled={loading} className="mt-0.5 rounded border-slate-300 data-[state=checked]:bg-[#0B2B1C] data-[state=checked]:border-[#0B2B1C] disabled:opacity-50 disabled:cursor-not-allowed" />
                     <label htmlFor="terms" className={`text-[11px] leading-relaxed cursor-pointer select-none ${loading ? 'opacity-50 pointer-events-none' : 'text-slate-400'}`}>
-                      I agree to the <a href="#" className="text-[#0B2B1C] hover:underline font-semibold">Terms</a> and <a href="#" className="text-[#0B2B1C] hover:underline font-semibold">Privacy Policy</a>
+                      I agree to the <a href="#" className={`text-[#0B2B1C] hover:underline font-semibold ${loading ? 'pointer-events-none' : ''}`}>Terms</a> and <a href="#" className={`text-[#0B2B1C] hover:underline font-semibold ${loading ? 'pointer-events-none' : ''}`}>Privacy Policy</a>
                     </label>
                   </div>
                   <Button type="submit" disabled={loading} className="w-full h-11 bg-[#0B2B1C] hover:bg-[#0B2B1C]/90 text-white rounded-xl font-semibold text-[13px] shadow-md shadow-[#0B2B1C]/15 gap-2 transition-all">

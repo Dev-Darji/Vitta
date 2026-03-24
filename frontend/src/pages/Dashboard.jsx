@@ -117,10 +117,10 @@ const Dashboard = () => {
   const totalPortfolio = accounts.reduce((s, a) => s + (a.balance || 0), 0);
 
   const stats = [
-    { label: 'Total Income',   value: summary.total_income,   icon: TrendingUp,   badge: 'Income',  badgeColor: 'bg-emerald-50 text-emerald-600', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600' },
-    { label: 'Total Expense',  value: summary.total_expense,  icon: TrendingDown,  badge: 'Expense', badgeColor: 'bg-rose-50 text-rose-500',      iconBg: 'bg-rose-50',    iconColor: 'text-rose-500' },
-    { label: 'Net Balance',    value: summary.net_balance,    icon: Wallet,        badge: summary.net_balance >= 0 ? 'Profit' : 'Deficit', badgeColor: summary.net_balance >= 0 ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-500', iconBg: 'bg-indigo-50', iconColor: 'text-indigo-600' },
-    { label: 'Transactions',   value: summary.transaction_count ?? 0, icon: Receipt, badge: 'All time', badgeColor: 'bg-amber-50 text-amber-600', iconBg: 'bg-amber-50', iconColor: 'text-amber-600', isCount: true },
+    { label: 'Total Income',   value: summary.total_income,   icon: TrendingUp,   badge: 'Income',  badgeColor: 'bg-emerald-50 text-emerald-600', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', path: '/transactions' },
+    { label: 'Total Expense',  value: summary.total_expense,  icon: TrendingDown,  badge: 'Expense', badgeColor: 'bg-rose-50 text-rose-500',      iconBg: 'bg-rose-50',    iconColor: 'text-rose-500', path: '/transactions' },
+    { label: 'Net Balance',    value: summary.net_balance,    icon: Wallet,        badge: summary.net_balance >= 0 ? 'Profit' : 'Deficit', badgeColor: summary.net_balance >= 0 ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-500', iconBg: 'bg-indigo-50', iconColor: 'text-indigo-600', path: '/reports' },
+    { label: 'Transactions',   value: summary.transaction_count ?? 0, icon: Receipt, badge: 'All time', badgeColor: 'bg-amber-50 text-amber-600', iconBg: 'bg-amber-50', iconColor: 'text-amber-600', isCount: true, path: '/transactions' },
   ];
 
   /* Process category breakdown for Expense Mix */
@@ -167,7 +167,11 @@ const Dashboard = () => {
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
-          <div key={i} className={`anim anim-${i + 2} bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-5 hover:shadow-md hover:border-slate-200 transition-all`}>
+          <div 
+            key={i} 
+            onClick={() => stat.path && navigate(stat.path)}
+            className={`anim anim-${i + 2} bg-white rounded-xl border border-slate-100 shadow-sm px-5 py-5 hover:shadow-md hover:border-slate-200 transition-all ${stat.path ? 'cursor-pointer active:scale-[0.98]' : ''}`}
+          >
             <div className="flex items-center justify-between mb-4">
               <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${stat.iconBg}`}>
                 <stat.icon className={`h-4 w-4 ${stat.iconColor}`} />

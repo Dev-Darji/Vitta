@@ -101,7 +101,7 @@ const FilterSelect = ({ value, onValueChange, placeholder, children, width = 'w-
 
 /* ─── Column Header ─── */
 const TH = ({ children, align = 'left', className = '' }) => (
-  <th className={`px-4 py-3 text-${align} text-[10.5px] font-semibold uppercase tracking-wider text-slate-400 bg-slate-50 ${className}`}>
+  <th className={`px-4 py-3 text-${align} text-[10.5px] font-bold uppercase tracking-wider text-slate-600 bg-slate-100/80 border-b border-slate-200 ${className}`}>
     {children}
   </th>
 );

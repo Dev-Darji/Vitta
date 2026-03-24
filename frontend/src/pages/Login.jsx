@@ -138,7 +138,7 @@ const Login = () => {
               <p className="text-slate-400 text-[13px]">Sign in to your Vitta account.</p>
             </div>
 
-            <form data-testid="login-form" onSubmit={handleSubmit} noValidate className="space-y-4">
+            <form data-testid="login-form" onSubmit={handleSubmit} noValidate className={`space-y-4 ${loading ? 'pointer-events-none select-none' : ''}`}>
 
               {/* Email */}
               <FieldWrapper label="Email address" error={errors.email}>

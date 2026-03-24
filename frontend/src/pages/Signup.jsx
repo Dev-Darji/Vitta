@@ -252,7 +252,7 @@ const Signup = () => {
               <p className="text-slate-400 text-[13px]">Join 2,000+ businesses growing with Vitta.</p>
             </div>
 
-            <form data-testid="signup-form" onSubmit={handleSubmit} noValidate className="space-y-4">
+            <form data-testid="signup-form" onSubmit={handleSubmit} noValidate className={`space-y-4 ${loading ? 'pointer-events-none select-none' : ''}`}>
 
               {/* Full name */}
               <FieldWrapper label="Full name" error={errors.name} success={successes.name}>
@@ -337,9 +337,9 @@ const Signup = () => {
                 />
                 <label htmlFor="terms" className={`text-[11px] leading-relaxed cursor-pointer select-none ${loading ? 'opacity-50 pointer-events-none' : 'text-slate-400'}`}>
                   I agree to the{' '}
-                  <a href="#" className="text-[#0B2B1C] hover:underline font-semibold">Terms of Service</a>
+                  <a href="#" className={`text-[#0B2B1C] hover:underline font-semibold ${loading ? 'pointer-events-none' : ''}`}>Terms of Service</a>
                   {' '}and{' '}
-                  <a href="#" className="text-[#0B2B1C] hover:underline font-semibold">Privacy Policy</a>
+                  <a href="#" className={`text-[#0B2B1C] hover:underline font-semibold ${loading ? 'pointer-events-none' : ''}`}>Privacy Policy</a>
                 </label>
               </div>
 

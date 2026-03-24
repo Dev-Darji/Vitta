@@ -247,7 +247,9 @@ const Clients = () => {
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2">
                         <MapPin className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
-                        <span className="text-[12px] text-slate-500 font-medium truncate">{client.country || 'Not specified'}</span>
+                        <span className="text-[12px] text-slate-500 font-medium truncate">
+                          {client.country || 'Not specified'} ({client.currency || 'INR'})
+                        </span>
                       </div>
                       {client.notes && (
                         <div className="flex items-start gap-2">
@@ -258,13 +260,7 @@ const Clients = () => {
                     </div>
                   </div>
 
-                  {/* Footer */}
-                  <div className="px-5 py-3 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400 font-medium">{client.currency || 'INR'}</span>
-                    <button className="text-[11.5px] font-medium text-slate-500 hover:text-primary transition-colors">
-                      View Details →
-                    </button>
-                  </div>
+
                 </div>
               </motion.div>
             ))}
