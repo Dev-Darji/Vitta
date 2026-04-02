@@ -744,14 +744,10 @@ const AddTransactions = () => {
     <div data-add-txn data-testid="add-transactions-page" className="space-y-6 pb-20">
       <FontStyle />
 
-      {/* ── Page Header ── */}
-      <div className="flex items-end justify-between pt-2">
+      <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-8 mt-2">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-[3px] h-5 bg-slate-800 rounded-full" />
-            <h1 className="text-[22px] font-bold tracking-tight text-slate-900 leading-none">Add Transactions</h1>
-          </div>
-          <p className="text-[12px] text-slate-400 font-medium ml-[18px]">Enter records manually or import from statements.</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Add Transactions</h1>
+          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">Manual Ledger Entry & Bulk Data Onboarding</p>
         </div>
       </div>
 

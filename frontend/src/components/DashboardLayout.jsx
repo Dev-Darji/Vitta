@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import {
-  LayoutDashboard, Upload, CreditCard, BarChart3, Tag, Wallet, Settings, LogOut, Menu,
-  PlusCircle, Building2, Plus, UserPlus, FileUp, PenLine
+import { motion, AnimatePresence } from 'framer-motion';
+import {  LayoutDashboard,  ArrowUpRight,  ArrowDownLeft,  Wallet,  TrendingUp,  Clock,  Plus,  Search,  MoreHorizontal, User, Users, Settings, CreditCard, FileText, Building2, PieChart as PieIcon, BarChart3, Receipt, PenLine, FileSpreadsheet, PlusCircle, Menu, LogOut, Upload, Tag, UserPlus, FileUp, Zap, History
 } from 'lucide-react';
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -12,7 +10,13 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuTrigger, DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import api from '@/lib/api';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useUAC } from '@/lib/UACContext';
 
 /* ─── Font ─────────────────────────────────────────────────────────────── */
 const FontStyle = () => (
@@ -23,24 +27,80 @@ const FontStyle = () => (
 );
 
 /* ─── Nav Items ─────────────────────────────────────────────────────────── */
-const menuItems = [
-  { path: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard',        testId: 'menu-dashboard' },
-  { path: '/clients',      icon: Building2,       label: 'Clients',          testId: 'menu-clients' },
-  { path: '/accounts',     icon: Wallet,           label: 'Accounts',         testId: 'menu-accounts' },
-  { path: '/transactions', icon: CreditCard,       label: 'Transactions',     testId: 'menu-transactions' },
-  { path: '/import',       icon: PlusCircle,       label: 'Add Transactions', testId: 'menu-import' },
-  { path: '/reports',      icon: BarChart3,        label: 'Reports',          testId: 'menu-reports' },
-  { path: '/categories',   icon: Tag,              label: 'Groups',           testId: 'menu-categories' },
-  { path: '/settings',     icon: Settings,         label: 'Settings',         testId: 'menu-settings' },
+const menuItemsRaw = [
+  { path: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard',        testId: 'menu-dashboard', feature: 'dashboard' },
+  { path: '/clients',      icon: Building2,       label: 'Clients',          testId: 'menu-clients',   feature: 'clients' },
+  { path: '/accounts',     icon: Wallet,           label: 'Accounts',         testId: 'menu-accounts',  feature: 'accounts' },
+  { path: '/transactions', icon: CreditCard,       label: 'Transactions',     testId: 'menu-transactions', feature: 'transactions' },
+  { path: '/invoices',     icon: FileText,         label: 'Invoices',         testId: 'menu-invoices',     feature: 'invoices' },
+  { path: '/import',       icon: PlusCircle,       label: 'Add Transactions', testId: 'menu-import',       feature: 'transactions' },
+  { path: '/reports',      icon: BarChart3,        label: 'Reports',          testId: 'menu-reports',      feature: 'reports' },
+  { path: '/categories',   icon: Tag,              label: 'Groups',           testId: 'menu-categories',   feature: 'settings' },
+  { path: '/automation',   icon: Zap,              label: 'Automation',       testId: 'menu-automation',   feature: 'automation' },
+  { path: '/audit',        icon: History,          label: 'Audit Trail',      testId: 'menu-audit',        feature: 'audit_trail' },
+  { path: '/settings',     icon: Settings,         label: 'Settings',         testId: 'menu-settings',     feature: 'settings' },
 ];
 
 /* ═══════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
-═══════════════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 const DashboardLayout = ({ children }) => {
   const navigate   = useNavigate();
   const location   = useLocation();
+  const { isEnabled } = useUAC();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Search state
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const searchInputRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const down = (e) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', down);
+    return () => document.removeEventListener('keydown', down);
+  }, []);
+
+  React.useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (query.length >= 2) {
+        setLoading(true);
+        try {
+          const res = await api.get(`/search?q=${query}`);
+          setResults(res.data.results);
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const handleSelect = (item) => {
+    setQuery('');
+    setIsFocused(false);
+    if (item.type === 'transaction') navigate('/transactions');
+    else if (item.type === 'client') navigate('/clients');
+    else if (item.type === 'account') navigate('/accounts');
+    else if (item.type === 'category') navigate('/categories');
+  };
+
+  const groupedResults = results.reduce((acc, curr) => {
+    if (!acc[curr.type]) acc[curr.type] = [];
+    acc[curr.type].push(curr);
+    return acc;
+  }, {});
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -50,7 +110,8 @@ const DashboardLayout = ({ children }) => {
     navigate('/login');
   };
 
-  const currentPage = menuItems.find(item => item.path === location.pathname)?.label || 'Dashboard';
+  const menuItems = menuItemsRaw.filter(item => isEnabled(item.feature));
+  const currentPage = menuItemsRaw.find(item => item.path === location.pathname)?.label || 'Dashboard';
 
   return (
     <div data-layout className="flex h-screen bg-slate-50 overflow-hidden">
@@ -156,103 +217,229 @@ const DashboardLayout = ({ children }) => {
           </button>
 
           {/* Page title */}
-          <p className="text-[15px] font-semibold text-slate-900">{currentPage}</p>
+          <p className="text-[15px] font-semibold text-slate-900 min-w-fit">{currentPage}</p>
+
+          {/* Centered Inline Search */}
+          <div className="flex-1 flex justify-center px-4 relative">
+             <div className="relative w-full max-w-sm">
+               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 transition-colors duration-200 ${isFocused ? 'text-emerald-500' : 'text-slate-400'}`} />
+               <Input 
+                 ref={searchInputRef}
+                 placeholder="Search transactions, clients..." 
+                 className={`h-8 pl-9 pr-12 rounded-lg border-slate-200 bg-slate-50 text-[12.5px] font-medium text-slate-700 transition-all focus-visible:ring-0 ${isFocused ? 'bg-white border-emerald-500/50 shadow-[0_0_0_2px_rgba(16,185,129,0.1)]' : ''}`}
+                 value={query}
+                 onChange={(e) => {setQuery(e.target.value); setIsFocused(true);}}
+                 onFocus={() => setIsFocused(true)}
+                 onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+               />
+               <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1 py-0.5 rounded border border-slate-100 bg-white text-[8.5px] font-bold text-slate-300">
+                 <span className="scale-75">⌘</span>K
+               </div>
+
+               {/* Dropdown Results */}
+               <AnimatePresence>
+                 {isFocused && (
+                   <motion.div 
+                     initial={{ opacity: 0, y: 4 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     exit={{ opacity: 0, y: 4 }}
+                     className="absolute top-full mt-1 left-0 right-0 bg-white border border-slate-100 shadow-xl rounded-xl overflow-hidden z-[100] max-h-[350px] overflow-y-auto"
+                   >
+                     {/* ─── SEARCHING STATE ─── */}
+                     {loading && query.length >= 2 && (
+                       <div className="flex items-center justify-center py-10 text-slate-400 text-[12px] font-medium gap-2">
+                         <div className="h-4 w-4 border-2 border-slate-200 border-t-primary rounded-full animate-spin" />
+                         Searching Vitta...
+                       </div>
+                     )}
+
+                     {/* ─── QUICK SUGGESTIONS (Empty Query) ─── */}
+                     {!loading && query.length < 2 && (
+                       <div className="p-2 space-y-3">
+                         <div>
+                            <h3 className="px-3 pt-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Quick Actions</h3>
+                            <div className="space-y-0.5">
+                              <button onMouseDown={() => {navigate('/import'); setIsFocused(false);}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition-colors group">
+                                <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                                  <Plus size={14} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[12.5px] font-bold text-slate-800 leading-tight">New Transaction</p>
+                                  <p className="text-[10px] text-slate-400">Record a single entry manually</p>
+                                </div>
+                              </button>
+                              <button onMouseDown={() => {navigate('/clients'); setIsFocused(false);}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition-colors group">
+                                <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                                  <UserPlus size={14} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[12.5px] font-bold text-slate-800 leading-tight">Add New Client</p>
+                                  <p className="text-[10px] text-slate-400">Setup a new business or customer</p>
+                                </div>
+                              </button>
+                              <button onMouseDown={() => {navigate('/reports'); setIsFocused(false);}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition-colors group">
+                                <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                                  <BarChart3 size={14} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[12.5px] font-bold text-slate-800 leading-tight">View Reports</p>
+                                  <p className="text-[10px] text-slate-400">Check P&L and financial statements</p>
+                                </div>
+                              </button>
+                            </div>
+                         </div>
+                       </div>
+                     )}
+
+                     {/* ─── SEARCH RESULTS ─── */}
+                     {!loading && results.length === 0 && query.length >= 2 && (
+                       <div className="py-12 text-center">
+                         <div className="h-10 w-10 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                           <Search className="h-5 w-5 text-slate-300" />
+                         </div>
+                         <p className="text-slate-400 text-[12.5px] font-medium">No results for <span className="text-slate-900">"{query}"</span></p>
+                       </div>
+                     )}
+
+                     {!loading && results.length > 0 && query.length >= 2 && (
+                       <div className="p-2 space-y-3 pb-3">
+                         {Object.entries(groupedResults).map(([type, items]) => (
+                           <div key={type}>
+                             <h3 className="px-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 mt-1">{type}s</h3>
+                             <div className="space-y-0.5">
+                               {items.map(item => (
+                                 <button
+                                   key={item.id}
+                                   onMouseDown={() => handleSelect(item)}
+                                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 text-left transition-colors group"
+                                 >
+                                   <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                     type === 'transaction' ? 'bg-blue-50 text-blue-600' :
+                                     type === 'client' ? 'bg-emerald-50 text-emerald-600' :
+                                     type === 'account' ? 'bg-purple-50 text-purple-600' : 'bg-slate-50 text-slate-600'
+                                   }`}>
+                                     {item.type === 'transaction' ? <CreditCard size={14} /> : 
+                                      item.type === 'client' ? <Building2 size={14} /> :
+                                      item.type === 'account' ? <Wallet size={14} /> : <Tag size={14} />}
+                                   </div>
+                                   <div className="flex-1 min-w-0">
+                                     <p className="text-[12.5px] font-bold text-slate-800 leading-tight truncate group-hover:text-primary">{item.title}</p>
+                                     <p className="text-[11px] text-slate-400 mt-0.5 truncate">{item.subtitle}</p>
+                                   </div>
+                                 </button>
+                               ))}
+                             </div>
+                           </div>
+                         ))}
+                       </div>
+                     )}
+                   </motion.div>
+                 )}
+               </AnimatePresence>
+             </div>
+          </div>
 
           {/* Right: quick actions */}
           <div className="ml-auto flex items-center gap-1">
             <TooltipProvider delayDuration={0}>
 
               {/* Add Client */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => navigate('/clients', { state: { openAdd: true } })}
-                    className="hidden xl:flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent className="text-[11px] font-medium bg-slate-900 text-white border-none px-2.5 py-1.5">
-                  Add Client
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Add Account */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => navigate('/accounts', { state: { openAdd: true } })}
-                    className="hidden xl:flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    <Wallet className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent className="text-[11px] font-medium bg-slate-900 text-white border-none px-2.5 py-1.5">
-                  Add Account
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Add Transaction dropdown */}
-              <DropdownMenu>
+              {isEnabled('clients') && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <button className="h-8 px-3 flex items-center gap-1.5 rounded-lg bg-primary text-white text-[12.5px] font-semibold hover:bg-primary/90 transition-colors shadow-sm">
-                        <Plus className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Add</span>
-                      </button>
-                    </DropdownMenuTrigger>
+                    <button
+                      onClick={() => navigate('/clients', { state: { openAdd: true } })}
+                      className="hidden xl:flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                    </button>
                   </TooltipTrigger>
                   <TooltipContent className="text-[11px] font-medium bg-slate-900 text-white border-none px-2.5 py-1.5">
-                    Add Transaction
+                    Add Client
                   </TooltipContent>
                 </Tooltip>
+              )}
 
-                <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-xl border border-slate-100 shadow-xl bg-white z-[100]">
-                  <div className="px-3 py-2 mb-1">
-                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Add Transaction</p>
-                  </div>
+              {/* Add Account */}
+              {isEnabled('accounts') && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => navigate('/accounts', { state: { openAdd: true } })}
+                      className="hidden xl:flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <Wallet className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-[11px] font-medium bg-slate-900 text-white border-none px-2.5 py-1.5">
+                    Add Account
+                  </TooltipContent>
+                </Tooltip>
+              )}
 
-                  <DropdownMenuItem
-                    onClick={() => navigate('/import', { state: { activeTab: 'manual' } })}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-50 group"
-                  >
-                    <div className="h-7 w-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-                      <PenLine className="h-3.5 w-3.5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-medium text-slate-800">Manual Entry</p>
-                      <p className="text-[11px] text-slate-400">Type a single transaction</p>
-                    </div>
-                  </DropdownMenuItem>
+              {/* Add Transaction dropdown */}
+              {isEnabled('transactions') && (
+                <DropdownMenu>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <button className="h-8 px-3 flex items-center gap-1.5 rounded-lg bg-primary text-white text-[12.5px] font-semibold hover:bg-primary/90 transition-colors shadow-sm">
+                          <Plus className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Add</span>
+                        </button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-[11px] font-medium bg-slate-900 text-white border-none px-2.5 py-1.5">
+                      Add Transaction
+                    </TooltipContent>
+                  </Tooltip>
 
-                  <DropdownMenuItem
-                    onClick={() => navigate('/import', { state: { activeTab: 'csv' } })}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-50 group"
-                  >
-                    <div className="h-7 w-7 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                      <FileUp className="h-3.5 w-3.5 text-emerald-600" />
+                  <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-xl border border-slate-100 shadow-xl bg-white z-[100]">
+                    <div className="px-3 py-2 mb-1">
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Add Transaction</p>
                     </div>
-                    <div>
-                      <p className="text-[13px] font-medium text-slate-800">CSV / Excel</p>
-                      <p className="text-[11px] text-slate-400">Import from spreadsheet</p>
-                    </div>
-                  </DropdownMenuItem>
 
-                  <DropdownMenuItem
-                    onClick={() => navigate('/import', { state: { activeTab: 'pdf' } })}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-50 group"
-                  >
-                    <div className="h-7 w-7 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
-                      <Upload className="h-3.5 w-3.5 text-orange-500" />
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-medium text-slate-800">PDF Statement</p>
-                      <p className="text-[11px] text-slate-400">Parse from bank PDF</p>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    <DropdownMenuItem
+                      onClick={() => navigate('/import', { state: { activeTab: 'manual' } })}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-50 group"
+                    >
+                      <div className="h-7 w-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                        <PenLine className="h-3.5 w-3.5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-medium text-slate-800">Manual Entry</p>
+                        <p className="text-[11px] text-slate-400">Type a single transaction</p>
+                      </div>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => navigate('/import', { state: { activeTab: 'csv' } })}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-50 group"
+                    >
+                      <div className="h-7 w-7 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                        <FileUp className="h-3.5 w-3.5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-medium text-slate-800">CSV / Excel</p>
+                        <p className="text-[11px] text-slate-400">Import from spreadsheet</p>
+                      </div>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => navigate('/import', { state: { activeTab: 'pdf' } })}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-50 group"
+                    >
+                      <div className="h-7 w-7 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
+                        <Upload className="h-3.5 w-3.5 text-orange-500" />
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-medium text-slate-800">PDF Statement</p>
+                        <p className="text-[11px] text-slate-400">Parse from bank PDF</p>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
 
             </TooltipProvider>
           </div>

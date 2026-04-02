@@ -2,11 +2,34 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  TrendingUp, TrendingDown, Wallet, ArrowUpRight,
-  PlusCircle, LayoutDashboard, CreditCard, History,
-  ArrowRight, Building2, ChevronRight,
-  PieChart as PieIcon, BarChart3, Receipt,
-  PenLine, FileSpreadsheet, Loader2, Sparkles
+  ArrowUpRight, 
+  ArrowDownLeft, 
+  Wallet, 
+  TrendingUp, 
+  TrendingDown,
+  Clock, 
+  Plus, 
+  Search, 
+  MoreHorizontal,
+  User,
+  Users,
+  Settings,
+  CreditCard,
+  CheckCircle2,
+  FileText,
+  PlusCircle,
+  LayoutDashboard,
+  History,
+  ArrowRight,
+  Building2,
+  ChevronRight,
+  PieChart as PieIcon,
+  BarChart3,
+  Receipt,
+  PenLine,
+  FileSpreadsheet,
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -78,29 +101,32 @@ const SectionHeader = ({ icon: Icon, iconBg, iconColor, title, subtitle, action 
 
 /* ═══════════════════════════════════════════════════════════════════════════
    MAIN COMPONENT
-═══════════════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════════════ */
 const Dashboard = () => {
   const navigate = useNavigate();
   const [summary, setSummary] = useState({ total_income: 0, total_expense: 0, net_balance: 0, transaction_count: 0 });
   const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [categoryBreakdown, setCategoryBreakdown] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [invoiceSummary, setInvoiceSummary] = useState({ total_invoiced: 0, total_paid: 0, total_outstanding: 0, total_overdue: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { fetchDashboardData(); }, []);
 
   const fetchDashboardData = async () => {
     try {
-      const [summaryRes, trendRes, accountsRes, breakdownRes] = await Promise.all([
+      const [summaryRes, trendRes, accountsRes, breakdownRes, invoiceRes] = await Promise.all([
         api.get('/reports/summary'),
         api.get('/reports/monthly-trend'),
         api.get('/accounts'),
         api.get('/reports/category-breakdown'),
+        api.get('/invoices/summary'),
       ]);
       setSummary(summaryRes.data);
       setMonthlyTrend(trendRes.data);
       setAccounts(accountsRes.data);
       setCategoryBreakdown(breakdownRes.data);
+      setInvoiceSummary(invoiceRes.data);
     } catch { toast.error('Failed to load dashboard data'); }
     finally { setLoading(false); }
   };
@@ -140,25 +166,22 @@ const Dashboard = () => {
       <FontStyle />
 
       {/* ── Page Header ── */}
-      <div className="anim anim-1 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+      <div className="anim anim-1 flex flex-col md:flex-row justify-between items-end gap-6 mb-8 mt-2">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-[3px] h-5 bg-slate-800 rounded-full" />
-            <h1 className="text-[22px] font-bold tracking-tight text-slate-900 leading-none">Dashboard</h1>
-          </div>
-          <p className="text-[12px] text-slate-400 font-medium ml-[18px]">Financial overview across all accounts.</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Dashboard</h1>
+          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">Consolidated Account Overview</p>
         </div>
 
-        {/* Portfolio pill */}
-        <div className="flex items-center gap-4 bg-white pl-5 pr-2 py-2 rounded-xl border border-slate-100 shadow-sm">
-          <div>
-            <p className="text-[9.5px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Portfolio Value</p>
-            <p className="text-[18px] font-bold text-slate-900 leading-tight">
-              <span className="text-[13px] font-medium text-slate-400 mr-0.5">₹</span>
+        {/* Portfolio metrics */}
+        <div className="flex items-center gap-6">
+          <div className="text-right">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Portfolio Value</p>
+            <p className="text-[20px] font-black text-slate-900 tabular-nums leading-none">
+              <span className="text-[14px] font-bold text-slate-300 mr-1">₹</span>
               {totalPortfolio.toLocaleString('en-IN')}
             </p>
           </div>
-          <Button onClick={() => navigate('/transactions')} className="bg-slate-900 hover:bg-black text-white h-9 px-5 rounded-lg text-[13px] font-semibold shadow-sm">
+          <Button onClick={() => navigate('/transactions')} className="bg-slate-900 hover:bg-black text-white h-9 px-6 rounded-lg text-[13px] font-bold shadow-lg shadow-slate-200">
             View Ledger
           </Button>
         </div>
@@ -358,21 +381,34 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Reports CTA */}
-          <div
-            className="anim anim-5 bg-[#10b981] text-white p-5 rounded-xl relative overflow-hidden cursor-pointer hover:bg-[#0da271] transition-colors group"
-            onClick={() => navigate('/reports')}
-          >
-            <Receipt className="absolute bottom-4 right-4 h-12 w-12 text-white/15 -rotate-12 group-hover:scale-110 transition-transform duration-300" />
-            <p className="text-[10px] font-semibold text-white/60 uppercase tracking-wider mb-1">Analytics</p>
-            <h4 className="text-[16px] font-bold text-white mb-1 leading-tight">Financial Reports</h4>
-            <p className="text-[12px] text-white/70 font-medium mb-4 leading-relaxed max-w-[200px]">
-              View income trends, expense breakdowns and export statements.
-            </p>
-            <Button onClick={(e) => { e.stopPropagation(); navigate('/reports'); }}
-              className="bg-slate-900 text-white hover:bg-black text-[12.5px] font-semibold px-5 h-8 rounded-lg shadow-sm border-none">
-              Open Reports
-            </Button>
+          {/* Outstanding Invoices Widget */}
+          <div className="anim anim-5 bg-white rounded-xl border border-slate-100 shadow-sm p-5 relative overflow-hidden group hover:shadow-md transition-all cursor-pointer" onClick={() => navigate('/invoices')}>
+             <div className="flex items-center justify-between mb-4">
+                <div className="h-9 w-9 rounded-lg bg-indigo-50 flex items-center justify-center">
+                    <FileText className="h-4 w-4 text-indigo-600" />
+                </div>
+                <div className="flex -space-x-2">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="h-6 w-6 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[8px] font-bold text-slate-400">
+                            {String.fromCharCode(64 + i)}
+                        </div>
+                    ))}
+                </div>
+             </div>
+             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Receivables</p>
+             <h4 className="text-[18px] font-bold text-slate-900 leading-tight">₹{(invoiceSummary.total_outstanding || 0).toLocaleString('en-IN')}</h4>
+             <p className="text-[11px] text-slate-500 mt-1 font-medium italic">Pending outstanding balance</p>
+             
+             {(invoiceSummary.total_overdue || 0) > 0 && (
+                <div className="mt-4 p-2 bg-rose-50 rounded-lg border border-rose-100 flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 bg-rose-500 rounded-full animate-pulse" />
+                    <span className="text-[10px] font-bold text-rose-600 uppercase tracking-widest">₹{(invoiceSummary.total_overdue || 0).toLocaleString('en-IN')} OVERDUE</span>
+                </div>
+             )}
+             
+             <div className="absolute -bottom-6 -right-6 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity">
+                <FileText className="h-32 w-32" />
+             </div>
           </div>
         </div>
       </div>

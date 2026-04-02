@@ -185,19 +185,19 @@ const AccountCard = ({ account, cfg, Icon, index, getClientName, onEdit, onDelet
               <div className="px-5 pb-4 space-y-4">
                 {/* Inflow / Outflow */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <div className="px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100">
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <ArrowRight className="h-3 w-3 text-emerald-500 rotate-[-45deg]" />
                       <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Inflow</p>
                     </div>
-                    <p className="text-[16px] font-bold text-emerald-700">{sym}0.00</p>
+                    <p className="text-[16px] font-bold text-emerald-700">{sym}{(account.inflow || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
                   </div>
                   <div className="px-4 py-3 bg-rose-50 rounded-xl border border-rose-100">
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <ArrowRight className="h-3 w-3 text-rose-500 rotate-[135deg]" />
                       <p className="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Outflow</p>
                     </div>
-                    <p className="text-[16px] font-bold text-rose-600">{sym}0.00</p>
+                    <p className="text-[16px] font-bold text-rose-600">{sym}{(account.outflow || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
                   </div>
                 </div>
 
@@ -309,8 +309,11 @@ const Accounts = () => {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const [accRes, clRes] = await Promise.all([api.get('/accounts'), api.get('/clients')]);
-      setAccounts(accRes.data);
+      const [accRes, clRes] = await Promise.all([
+        api.get('/accounts/summary'),
+        api.get('/clients')
+      ]);
+      setAccounts(accRes.data.accounts);
       setClients(clRes.data);
       if (clRes.data.length > 0) setNewAccount(prev => ({ ...prev, client_id: clRes.data[0].id }));
     } catch { toast.error('Failed to load data'); }
@@ -374,21 +377,18 @@ const Accounts = () => {
       <FontStyle />
 
       {/* ── Page Header ── */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-5 pt-2">
+      <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-8 mt-2">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-[3px] h-5 bg-slate-800 rounded-full" />
-            <h1 className="text-[22px] font-bold tracking-tight text-slate-900 leading-none">Accounts</h1>
-          </div>
-          <p className="text-[12px] text-slate-400 font-medium ml-[18px]">Monitor balances and manage financial ledgers.</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Accounts Management</h1>
+          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">Financial Ledger Control & Balances</p>
         </div>
 
         {/* ── Create Account Dialog ── */}
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-slate-900 hover:bg-black text-white h-9 px-5 rounded-lg flex items-center gap-2 shadow-sm">
+            <Button className="bg-slate-900 hover:bg-black text-white h-9 px-6 rounded-lg flex items-center gap-2 shadow-lg shadow-slate-200 font-bold text-[13px]">
               <Plus className="h-4 w-4" />
-              <span className="text-[13px] font-semibold translate-y-[-0.5px]">Add Account</span>
+              <span>Add Account</span>
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[480px] rounded-2xl border border-slate-100 shadow-2xl p-0 overflow-hidden bg-white">
@@ -408,7 +408,7 @@ const Accounts = () => {
                 <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} className="h-9 px-5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={submitting} className="h-9 px-6 rounded-lg bg-primary text-white text-[13px] font-semibold shadow-sm">
+                <Button type="submit" disabled={submitting} className="h-9 px-6 rounded-lg bg-slate-900 text-white text-[13px] font-bold shadow-sm">
                   {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Account'}
                 </Button>
               </div>

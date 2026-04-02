@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
+import asyncio
 # --- FIX FOR PASSLIB/BCRYPT COMPATIBILITY ---
 import bcrypt
 # Some versions of passlib look for __about__.__version__ which is missing in bcrypt 4.x
@@ -25,6 +26,7 @@ import pandas as pd
 import io
 import PyPDF2
 import re
+import json
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -59,6 +61,49 @@ security = HTTPBearer()
 SECRET_KEY = get_env("SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+
+# ==================== ERROR HANDLING ====================
+
+class VittaException(HTTPException):
+    def __init__(self, status_code: int, detail: str, error_code: str, suggestion: str = None):
+        super().__init__(status_code=status_code, detail={
+            "error_code": error_code,
+            "detail": detail,
+            "suggestion": suggestion
+        })
+
+class NotFoundError(VittaException):
+    def __init__(self, resource: str, id: str = None):
+        detail = f"{resource} with ID {id} not found" if id else f"{resource} not found"
+        super().__init__(404, detail, f"{resource.upper()}_NOT_FOUND", "Please select a valid record.")
+
+class AuthError(VittaException):
+    def __init__(self, detail: str, suggestion: str = "Please log in again."):
+        super().__init__(401, detail, "AUTH_ERROR", suggestion)
+
+class ValidationError(VittaException):
+    def __init__(self, detail: str, error_code: str = "VALIDATION_ERROR"):
+        super().__init__(422, detail, error_code, "Check the provided data fields.")
+
+class DatabaseError(VittaException):
+    def __init__(self, detail: str):
+        super().__init__(500, detail, "DATABASE_ERROR", "Ensure your MongoDB connectivity is stable.")
+
+class SystemConfig(BaseModel):
+    id: str = "global_config"
+    features: Dict[str, bool] = {
+        "dashboard": True,
+        "clients": True,
+        "accounts": True,
+        "transactions": True,
+        "invoices": True,
+        "reports": True,
+        "gst_reports": True,
+        "automation": True,
+        "audit_trail": True,
+        "settings": True
+    }
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -214,6 +259,92 @@ class Transaction(BaseModel):
     metadata: Optional[dict] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class InvoiceLineItem(BaseModel):
+    description: str
+    quantity: float = 1
+    unit_price: float
+    tax_rate: float = 0  
+    amount: float  # quantity * unit_price
+    tax_amount: float  # amount * tax_rate / 100
+
+class InvoiceCreate(BaseModel):
+    client_id: str
+    account_id: str 
+    invoice_number: Optional[str] = None
+    date: str 
+    due_date: str 
+    line_items: List[InvoiceLineItem]
+    notes: Optional[str] = None
+    terms: Optional[str] = None
+    tax_type: str = "GST"
+    discount_type: Optional[str] = None
+    discount_value: float = 0
+    currency: str = "INR"
+
+class Invoice(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    client_id: str
+    account_id: str
+    invoice_number: str
+    date: str
+    due_date: str
+    items: List[InvoiceLineItem]
+    tax_amount: float
+    total: float
+    amount_paid: float = 0
+    balance_due: float
+    notes: Optional[str] = None
+    terms: Optional[str] = None
+    tax_type: str = "GST"
+    currency: str = "INR"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+    sent_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+
+class AuditLog(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    action: str  # create, update, delete, login, export
+    resource: str # invoice, transaction, account, category, user
+    resource_id: Optional[str] = None
+    details: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    ip_address: Optional[str] = None
+
+class AutomationRuleCreate(BaseModel):
+    keyword: str
+    category_id: str
+    is_active: bool = True
+
+class AutomationRule(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    keyword: str
+    category_id: str
+    is_active: bool
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# ==================== HELPERS ====================
+
+async def log_action(user_id: str, action: str, resource: str, details: str, resource_id: str = None):
+    try:
+        log_entry = AuditLog(
+            user_id=user_id,
+            action=action,
+            resource=resource,
+            resource_id=resource_id,
+            details=details
+        )
+        await db.audit_logs.insert_one(log_entry.model_dump())
+    except Exception as e:
+        import logging
+        logging.error(f"Failed to log action: {e}")
+
 class TransactionUpdate(BaseModel):
     account_id: Optional[str] = None
     date: Optional[str] = None
@@ -263,7 +394,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
     if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise AuthError("User associated with this session no longer exists.")
     
     if isinstance(user.get('created_at'), str):
         user['created_at'] = datetime.fromisoformat(user['created_at'])
@@ -345,10 +476,7 @@ async def register(user_data: UserCreate):
         await db.users.insert_one(user_dict)
     except Exception as e:
         logger.error(f"Failed to insert user: {e}")
-        raise HTTPException(
-            status_code=500, 
-            detail="Database connection failed. If you are using MongoDB Atlas, please ensure your IP is whitelisted."
-        )
+        raise DatabaseError("Database insertion failed. Please contact support.")
     
     # Create default categories
     default_categories = [
@@ -393,7 +521,7 @@ async def login(user_data: UserLogin):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     if not verify_password(user_data.password, user_doc["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise AuthError("The password you entered is incorrect.")
     
     user_doc.pop("_id", None)
     user_doc.pop("password_hash", None)
@@ -443,7 +571,7 @@ async def create_account(account_data: BankAccountCreate, current_user: User = D
     # Verify client belongs to user
     client = await db.clients.find_one({"id": account_data.client_id, "user_id": current_user.id})
     if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
+        raise NotFoundError("Client", account_data.client_id)
 
     account = BankAccount(
         user_id=current_user.id,
@@ -470,6 +598,8 @@ async def create_account(account_data: BankAccountCreate, current_user: User = D
     opening_txn_dict['created_at'] = opening_txn_dict['created_at'].isoformat()
     await db.transactions.insert_one(opening_txn_dict)
 
+    await log_action(current_user.id, "create", "account", f"Created account: {account.account_name} ({account.account_type})", account.id)
+
     return account
 
 @api_router.get("/accounts", response_model=List[BankAccount])
@@ -482,6 +612,43 @@ async def get_accounts(current_user: User = Depends(get_current_user)):
     
     return accounts
 
+@api_router.get("/accounts/summary")
+async def get_accounts_summary(current_user: User = Depends(get_current_user)):
+    # Aggregation to get inflow (credit) and outflow (debit) per account
+    pipeline = [
+        {"$match": {"user_id": current_user.id}},
+        {
+            "$group": {
+                "_id": "$account_id",
+                "inflow": {
+                    "$sum": {
+                        "$cond": [{"$eq": ["$type", "credit"]}, "$amount", 0]
+                    }
+                },
+                "outflow": {
+                    "$sum": {
+                        "$cond": [{"$eq": ["$type", "debit"]}, "$amount", 0]
+                    }
+                }
+            }
+        }
+    ]
+    
+    summary_results = await db.transactions.aggregate(pipeline).to_list(1000)
+    summary_map = {item["_id"]: item for item in summary_results}
+    
+    accounts = await db.accounts.find({"user_id": current_user.id}, {"_id": 0}).to_list(1000)
+    
+    for acc in accounts:
+        acc_id = acc["id"]
+        acc["inflow"] = summary_map.get(acc_id, {}).get("inflow", 0.0)
+        acc["outflow"] = summary_map.get(acc_id, {}).get("outflow", 0.0)
+        
+        if isinstance(acc.get('created_at'), str):
+            acc['created_at'] = datetime.fromisoformat(acc['created_at'])
+    
+    return {"accounts": accounts}
+
 @api_router.delete("/accounts/{account_id}")
 async def delete_account(account_id: str, current_user: User = Depends(get_current_user)):
     # Delete all transactions first
@@ -489,6 +656,8 @@ async def delete_account(account_id: str, current_user: User = Depends(get_curre
     result = await db.accounts.delete_one({"id": account_id, "user_id": current_user.id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Account not found")
+    
+    await log_action(current_user.id, "delete", "account", f"Deleted account ID: {account_id}", account_id)
     return {"message": "Account deleted successfully"}
 
 @api_router.put("/accounts/{account_id}")
@@ -526,6 +695,7 @@ async def update_account(account_id: str, account_data: BankAccountUpdate, curre
         {"$set": update_dict}
     )
     
+    await log_action(current_user.id, "update", "account", f"Updated account: {existing_account['account_name']}", account_id)
     return {"message": "Account updated successfully"}
 
 # ==================== CLIENT ROUTES ====================
@@ -539,6 +709,8 @@ async def create_client(client_data: ClientCreate, current_user: User = Depends(
     client_dict = client.model_dump()
     client_dict['created_at'] = client_dict['created_at'].isoformat()
     await db.clients.insert_one(client_dict)
+    
+    await log_action(current_user.id, "create", "client", f"Created client: {client.name}", client.id)
     return client
 
 @api_router.get("/clients", response_model=List[Client])
@@ -550,6 +722,15 @@ async def get_clients(current_user: User = Depends(get_current_user)):
             c['created_at'] = datetime.fromisoformat(c['created_at'])
     return clients
 
+@api_router.get("/clients/{client_id}", response_model=Client)
+async def get_client(client_id: str, current_user: User = Depends(get_current_user)):
+    client = await db.clients.find_one({"id": client_id, "user_id": current_user.id}, {"_id": 0})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if isinstance(client.get('created_at'), str):
+        client['created_at'] = datetime.fromisoformat(client['created_at'])
+    return client
+
 @api_router.delete("/clients/{client_id}")
 async def delete_client(client_id: str, current_user: User = Depends(get_current_user)):
     # Also delete child accounts and transactions? 
@@ -557,6 +738,8 @@ async def delete_client(client_id: str, current_user: User = Depends(get_current
     result = await db.clients.delete_one({"id": client_id, "user_id": current_user.id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Client not found")
+    
+    await log_action(current_user.id, "delete", "client", f"Deleted client ID: {client_id}", client_id)
     return {"message": "Client deleted successfully"}
 
 # ==================== CATEGORY ROUTES ====================
@@ -574,6 +757,8 @@ async def create_category(category_data: CategoryCreate, current_user: User = De
     category_dict['created_at'] = category_dict['created_at'].isoformat()
     
     await db.categories.insert_one(category_dict)
+    
+    await log_action(current_user.id, "create", "category", f"Created group: {category.name}", category.id)
     return category
 
 @api_router.get("/categories", response_model=List[Category])
@@ -591,6 +776,8 @@ async def delete_category(category_id: str, current_user: User = Depends(get_cur
     result = await db.categories.delete_one({"id": category_id, "user_id": current_user.id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Group not found")
+    
+    await log_action(current_user.id, "delete", "category", f"Deleted group ID: {category_id}", category_id)
     return {"message": "Group deleted successfully"}
 
 # ==================== TRANSACTION ROUTES ====================
@@ -598,10 +785,20 @@ async def delete_category(category_id: str, current_user: User = Depends(get_cur
 @api_router.post("/transactions", response_model=Transaction)
 async def create_transaction(transaction_data: TransactionCreate, current_user: User = Depends(get_current_user)):
     # Verify account belongs to user
-    account = await db.accounts.find_one({"id": transaction_data.account_id, "user_id": current_user.id})
-    if not account:
+    account_doc = await db.accounts.find_one({"id": transaction_data.account_id, "user_id": current_user.id})
+    if not account_doc:
         raise HTTPException(status_code=404, detail="Account not found")
     
+    # --- PHASE 2.6: Automation Rules ---
+    # Auto-categorize if category is not provided
+    if not transaction_data.category_id:
+        rules = await db.automation_rules.find({"user_id": current_user.id, "is_active": True}).to_list(100)
+        desc_lower = transaction_data.description.lower()
+        for rule in rules:
+            if rule['keyword'].lower() in desc_lower:
+                transaction_data.category_id = rule['category_id']
+                break
+
     transaction = Transaction(
         user_id=current_user.id,
         **transaction_data.model_dump()
@@ -616,20 +813,22 @@ async def create_transaction(transaction_data: TransactionCreate, current_user: 
     await db.transactions.insert_one(transaction_dict)
     
     # Update account balance
-    if transaction.type == "credit":
-        await db.accounts.update_one(
-            {"id": transaction_data.account_id},
-            {"$inc": {"balance": transaction_data.amount}}
-        )
-    else:
-        await db.accounts.update_one(
-            {"id": transaction_data.account_id},
-            {"$inc": {"balance": -transaction_data.amount}}
-        )
+    balance_inc = transaction_data.amount if transaction.type == "credit" else -transaction_data.amount
+    await db.accounts.update_one(
+        {"id": transaction_data.account_id},
+        {"$inc": {"balance": balance_inc}}
+    )
+    
+    # --- PHASE 2.5: Audit Logging ---
+    await log_action(
+        current_user.id, "create", "transaction", 
+        f"Created {transaction.type} transaction: {transaction.description} for ₹{transaction.amount}",
+        transaction.id
+    )
     
     return transaction
 
-@api_router.get("/transactions", response_model=List[Transaction])
+@api_router.get("/transactions")
 async def get_transactions(
     account_id: Optional[str] = None,
     category_id: Optional[str] = None,
@@ -637,6 +836,8 @@ async def get_transactions(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     reference: Optional[str] = None,
+    page: int = 1,
+    page_size: str = "50",
     current_user: User = Depends(get_current_user)
 ):
     query = {"user_id": current_user.id}
@@ -680,8 +881,89 @@ async def get_transactions(
         if isinstance(txn.get('created_at'), str):
             txn['created_at'] = datetime.fromisoformat(txn['created_at'])
     
-    # Return reversed for 'most recent first' BUT opening will be at the bottom
-    return transactions[::-1]
+    total = len(transactions)
+    
+    # Handle pagination
+    if page_size != "all":
+        try:
+            ps = int(page_size)
+            start_idx = (page - 1) * ps
+            end_idx = page * ps
+            
+            # Since transactions are ASC, we calculate sum before start_idx
+            starting_balance = 0
+            for i in range(min(start_idx, total)):
+                txn = transactions[i]
+                if txn['type'] in ['credit', 'opening']:
+                    starting_balance += txn['amount']
+                else:
+                    starting_balance -= txn['amount']
+            
+            paged_transactions = transactions[start_idx:min(end_idx, total)]
+            
+            return {
+                "transactions": paged_transactions[::-1],
+                "total": total,
+                "page": page,
+                "page_size": ps,
+                "total_pages": (total + ps - 1) // ps,
+                "starting_balance": starting_balance
+            }
+        except ValueError:
+            pass
+
+    return {
+        "transactions": transactions[::-1],
+        "total": total,
+        "page": 1,
+        "page_size": total,
+        "total_pages": 1,
+        "starting_balance": 0
+    }
+
+@api_router.get("/transactions/count")
+async def get_transactions_count(
+    account_id: Optional[str] = None,
+    category_id: Optional[str] = None,
+    type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    reference: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    query = {"user_id": current_user.id}
+    if account_id: query["account_id"] = account_id
+    if category_id: query["category_id"] = category_id
+    if type: query["type"] = type
+    
+    # Since date filtering and reference filtering are currently in-memory (due to DD-MM-YYYY format),
+    # we have to fetch all and filter in memory if those filters are provided.
+    # Otherwise, we can use db.count_documents.
+    
+    if not (date_from or date_to or reference):
+        count = await db.transactions.count_documents(query)
+        return {"total": count}
+    
+    # If complex filters are used, we follow the same logic as get_transactions
+    transactions = await db.transactions.find(query, {"id": 1, "date": 1, "reference_number": 1, "cheque_number": 1}).to_list(10000)
+    
+    def get_date_obj(date_str):
+        try: return datetime.strptime(date_str, '%d-%m-%Y')
+        except: return datetime.min
+
+    if date_from:
+        df_obj = get_date_obj(normalize_date(date_from))
+        transactions = [t for t in transactions if get_date_obj(t['date']) >= df_obj]
+    if date_to:
+        dt_obj = get_date_obj(normalize_date(date_to))
+        transactions = [t for t in transactions if get_date_obj(t['date']) <= dt_obj]
+    if reference:
+        ref_lower = reference.lower()
+        transactions = [t for t in transactions if 
+                        (t.get('reference_number') and ref_lower in t['reference_number'].lower()) or 
+                        (t.get('cheque_number') and ref_lower in t['cheque_number'].lower())]
+    
+    return {"total": len(transactions)}
 
 @api_router.put("/transactions/{transaction_id}", response_model=Transaction)
 async def update_transaction(
@@ -724,6 +1006,8 @@ async def update_transaction(
         {"$set": update_dict}
     )
     
+    await log_action(current_user.id, "update", "transaction", f"Updated transaction: {existing_txn['description']}", transaction_id)
+    
     transaction = await db.transactions.find_one({"id": transaction_id}, {"_id": 0})
     if isinstance(transaction.get('created_at'), str):
         transaction['created_at'] = datetime.fromisoformat(transaction['created_at'])
@@ -753,7 +1037,344 @@ async def delete_transaction(transaction_id: str, current_user: User = Depends(g
         )
     
     await db.transactions.delete_one({"id": transaction_id})
+    await log_action(current_user.id, "delete", "transaction", f"Deleted transaction: {transaction['description']}", transaction_id)
     return {"message": "Transaction deleted successfully"}
+
+@api_router.post("/transactions/bulk-delete")
+async def bulk_delete_transactions(payload: dict, current_user: User = Depends(get_current_user)):
+    transaction_ids = payload.get("transaction_ids", [])
+    if not transaction_ids:
+        raise HTTPException(status_code=400, detail="No transaction IDs provided")
+    
+    # Fetch transactions to update balances
+    cursor = db.transactions.find({"id": {"$in": transaction_ids}, "user_id": current_user.id})
+    transactions = await cursor.to_list(len(transaction_ids))
+    
+    # Filter out opening balance transactions if any
+    transactions_to_delete = [t for t in transactions if t.get("type") != "opening"]
+    ids_to_delete = [t["id"] for t in transactions_to_delete]
+    
+    if not ids_to_delete:
+        return {"message": "No deletable transactions selected (Opening balances cannot be bulk deleted)"}
+    
+    # Reverse balance impact for each
+    for txn in transactions_to_delete:
+        inc = -txn["amount"] if txn["type"] == "credit" else txn["amount"]
+        await db.accounts.update_one({"id": txn["account_id"]}, {"$inc": {"balance": inc}})
+    
+    await db.transactions.delete_many({"id": {"$in": ids_to_delete}})
+    
+    await log_action(current_user.id, "delete", "transaction", f"Bulk deleted {len(ids_to_delete)} transactions", None)
+    return {"message": f"Successfully deleted {len(ids_to_delete)} transactions"}
+
+@api_router.post("/transactions/bulk-update-category")
+async def bulk_update_category(payload: dict, current_user: User = Depends(get_current_user)):
+    transaction_ids = payload.get("transaction_ids", [])
+    category_id = payload.get("category_id")
+    
+    if not transaction_ids or not category_id:
+        raise HTTPException(status_code=400, detail="Transaction IDs and Category ID are required")
+    
+    await db.transactions.update_many(
+        {"id": {"$in": transaction_ids}, "user_id": current_user.id},
+        {"$set": {"category_id": category_id}}
+    )
+    
+    await log_action(current_user.id, "update", "transaction", f"Bulk updated category for {len(transaction_ids)} transactions", None)
+    return {"message": f"Successfully updated category for {len(transaction_ids)} transactions"}
+
+@api_router.get("/search")
+async def global_search(q: str, current_user: User = Depends(get_current_user)):
+    if not q or len(q) < 2:
+        return {"results": []}
+    
+    regex_query = {"$regex": q, "$options": "i"}
+    limit = 10
+    
+    results = []
+    
+    # 1. Search Transactions
+    transactions = await db.transactions.find({
+        "user_id": current_user.id,
+        "$or": [
+            {"description": regex_query},
+            {"ledger_name": regex_query},
+            {"notes": regex_query},
+            {"reference_number": regex_query},
+            {"cheque_number": regex_query}
+        ]
+    }, {"_id": 0}).limit(limit).to_list(limit)
+    
+    for t in transactions:
+        results.append({
+            "type": "transaction",
+            "title": t["description"],
+            "subtitle": f"{t['date']} · {t['type'].capitalize()} · ₹{t['amount']}",
+            "id": t["id"],
+            "data": t
+        })
+        
+    # 2. Search Clients
+    clients = await db.clients.find({
+        "user_id": current_user.id,
+        "$or": [
+            {"name": regex_query},
+            {"business_type": regex_query},
+            {"notes": regex_query}
+        ]
+    }, {"_id": 0}).limit(limit).to_list(limit)
+    
+    for c in clients:
+        results.append({
+            "type": "client",
+            "title": c["name"],
+            "subtitle": f"{c['business_type'] or 'Client'} · {c['country']}",
+            "id": c["id"],
+            "data": c
+        })
+        
+    # 3. Search Accounts
+    accounts = await db.accounts.find({
+        "user_id": current_user.id,
+        "$or": [
+            {"account_name": regex_query},
+            {"bank_name": regex_query},
+            {"account_number": regex_query}
+        ]
+    }, {"_id": 0}).limit(limit).to_list(limit)
+    
+    for a in accounts:
+        results.append({
+            "type": "account",
+            "title": a["account_name"],
+            "subtitle": f"{a['account_type']} · {a['bank_name'] or ''}",
+            "id": a["id"],
+            "data": a
+        })
+        
+    # 4. Search Categories
+    categories = await db.categories.find({
+        "user_id": current_user.id,
+        "name": regex_query
+    }, {"_id": 0}).limit(limit).to_list(limit)
+    
+    for cat in categories:
+        results.append({
+            "type": "category",
+            "title": cat["name"],
+            "subtitle": f"{cat['type'].capitalize()} Group",
+            "id": cat["id"],
+            "data": cat
+        })
+        
+    return {"results": results}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ══ INVOICES ══
+# ─────────────────────────────────────────────────────────────────────────────
+
+@api_router.post("/invoices", response_model=Invoice)
+async def create_invoice(data: InvoiceCreate, current_user: User = Depends(get_current_user)):
+    # 1. Validation
+    client = await db.clients.find_one({"id": data.client_id, "user_id": current_user.id})
+    if not client: raise HTTPException(status_code=404, detail="Client not found")
+    
+    account = await db.accounts.find_one({"id": data.account_id, "user_id": current_user.id})
+    if not account: raise HTTPException(status_code=404, detail="Account not found")
+
+    # 2. Generate Invoice Number
+    inv_num = data.invoice_number
+    if not inv_num:
+        year = datetime.now().year
+        last_inv = await db.invoices.find({"user_id": current_user.id}).sort("created_at", -1).limit(1).to_list(1)
+        seq = 1
+        if last_inv:
+            try:
+                parts = last_inv[0]['invoice_number'].split('-')
+                seq = int(parts[-1]) + 1
+            except: seq = 1
+        inv_num = f"INV-{year}-{seq:03d}"
+
+    # 3. Calculations
+    subtotal = sum(item.amount for item in data.line_items)
+    tax_total = sum(item.tax_amount for item in data.line_items)
+    
+    discount_amt = 0
+    if data.discount_type == "percentage":
+        discount_amt = subtotal * (data.discount_value / 100)
+    elif data.discount_type == "fixed":
+        discount_amt = data.discount_value
+        
+    total = subtotal - discount_amt + tax_total
+    
+    # 4. Create Object
+    invoice = Invoice(
+        user_id=current_user.id,
+        client_id=data.client_id,
+        account_id=data.account_id,
+        invoice_number=inv_num,
+        date=normalize_date(data.date),
+        due_date=normalize_date(data.due_date),
+        line_items=data.line_items,
+        subtotal=subtotal,
+        discount_amount=discount_amt,
+        tax_amount=tax_total,
+        total=total,
+        balance_due=total,
+        notes=data.notes,
+        terms=data.terms,
+        tax_type=data.tax_type,
+        currency=data.currency
+    )
+
+    inv_dict = invoice.model_dump()
+    inv_dict['created_at'] = inv_dict['created_at'].isoformat()
+    await db.invoices.insert_one(inv_dict)
+    
+    await log_action(current_user.id, "create", "invoice", f"Created invoice {invoice.invoice_number} for {total}", invoice.id)
+    return invoice
+
+@api_router.get("/invoices")
+async def get_invoices(
+    status: Optional[str] = None, 
+    client_id: Optional[str] = None, 
+    page: int = 1,
+    limit: int = 15,
+    current_user: User = Depends(get_current_user)
+):
+    query = {"user_id": current_user.id}
+    if status: query["status"] = status
+    if client_id: query["client_id"] = client_id
+    
+    skip = (page - 1) * limit
+    total_count = await db.invoices.count_documents(query)
+    
+    # Corrected projection logic to return list of Invoice objects
+    docs = await db.invoices.find(query, {"_id": 0})\
+                           .sort("created_at", -1)\
+                           .skip(skip)\
+                           .limit(limit)\
+                           .to_list(limit)
+    today = datetime.now().date()
+    
+    for doc in docs:
+        if isinstance(doc.get('created_at'), str):
+            doc['created_at'] = datetime.fromisoformat(doc['created_at'])
+        
+        # Overdue logic on the fly
+        if doc['status'] == 'sent' or doc['status'] == 'draft':
+            try:
+                due = datetime.strptime(doc['due_date'], "%d-%m-%Y").date()
+                if due < today:
+                    doc['status'] = 'overdue'
+            except: pass
+            
+    return {
+        "invoices": docs,
+        "total": total_count,
+        "page": page,
+        "limit": limit
+    }
+
+@api_router.get("/invoices/summary")
+async def get_invoice_summary(current_user: User = Depends(get_current_user)):
+    pipeline = [
+        {"$match": {"user_id": current_user.id, "status": {"$ne": "cancelled"}}},
+        {"$group": {
+            "_id": None,
+            "total_invoiced": {"$sum": "$total"},
+            "total_paid": {"$sum": "$amount_paid"},
+            "total_outstanding": {"$sum": "$balance_due"}
+        }}
+    ]
+    res = await db.invoices.aggregate(pipeline).to_list(1)
+    
+    summary = res[0] if res else {"total_invoiced": 0, "total_paid": 0, "total_outstanding": 0}
+    summary.pop("_id", None)
+    
+    # Overdue count
+    today_str = datetime.now().strftime("%d-%m-%Y")
+    # This is rough as string compare, but better to fetch and filter for accuracy
+    invoices = await db.invoices.find({"user_id": current_user.id, "status": {"$in": ["sent", "draft"]}}).to_list(1000)
+    overdue_amt = 0
+    today = datetime.now().date()
+    for inv in invoices:
+        try:
+            due = datetime.strptime(inv['due_date'], "%d-%m-%Y").date()
+            if due < today: overdue_amt += inv['balance_due']
+        except: pass
+        
+    summary["total_overdue"] = overdue_amt
+    return summary
+
+@api_router.get("/invoices/{id}")
+async def get_invoice(id: str, current_user: User = Depends(get_current_user)):
+    doc = await db.invoices.find_one({"id": id, "user_id": current_user.id}, {"_id": 0})
+    if not doc: raise HTTPException(status_code=404, detail="Invoice not found")
+    if isinstance(doc.get('created_at'), str):
+        doc['created_at'] = datetime.fromisoformat(doc['created_at'])
+    return doc
+
+@api_router.post("/invoices/{id}/record-payment")
+async def record_payment(id: str, data: dict, current_user: User = Depends(get_current_user)):
+    amount = data.get("amount", 0)
+    invoice = await db.invoices.find_one({"id": id, "user_id": current_user.id})
+    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+
+    new_paid = invoice['amount_paid'] + amount
+    new_balance = invoice['total'] - new_paid
+    new_status = "paid" if new_balance <= 0 else invoice['status']
+    
+    await db.invoices.update_one(
+        {"id": id}, 
+        {"$set": {
+            "amount_paid": new_paid, 
+            "balance_due": max(0, new_balance),
+            "status": new_status,
+            "paid_at": datetime.now(timezone.utc).isoformat() if new_balance <= 0 else None,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    # ══ AUTO-LEDGER SYNC ══
+    # Create a credit transaction in the linked bank account
+    from uuid import uuid4
+    payment_txn = {
+        "id": str(uuid4()),
+        "user_id": current_user.id,
+        "account_id": invoice['account_id'],
+        "date": datetime.now().strftime("%d-%m-%Y"),
+        "description": f"Payment for {invoice['invoice_number']}",
+        "amount": amount,
+        "type": "credit",
+        "notes": f"Auto-generated from invoice {invoice['invoice_number']}",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.transactions.insert_one(payment_txn)
+    await db.accounts.update_one({"id": invoice['account_id']}, {"$inc": {"balance": amount}})
+    
+    return {"status": "success", "balance_due": max(0, new_balance)}
+
+@api_router.post("/invoices/{id}/send")
+async def send_invoice(id: str, current_user: User = Depends(get_current_user)):
+    await db.invoices.update_one(
+        {"id": id, "user_id": current_user.id},
+        {"$set": {"status": "sent", "sent_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"status": "sent"}
+
+@api_router.delete("/invoices/{id}")
+async def delete_invoice(id: str, current_user: User = Depends(get_current_user)):
+    # Only drafts can be deleted to maintain audit trail
+    invoice = await db.invoices.find_one({"id": id, "user_id": current_user.id})
+    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    if invoice['status'] != 'draft':
+        raise HTTPException(status_code=400, detail="Only draft invoices can be deleted")
+    
+    await db.invoices.delete_one({"id": id})
+    await log_action(current_user.id, "delete", "invoice", f"Deleted invoice ID: {id}", id)
+    return {"status": "deleted"}
 
 # ==================== CSV IMPORT ROUTES ====================
 
@@ -993,6 +1614,10 @@ async def import_csv(
                 # Auto-categorize based on Group column if available, else keywords
                 category_id = None
                 
+                # Fetch automation rules before the loop for efficiency
+                if 'automation_rules' not in locals():
+                    automation_rules = await db.automation_rules.find({"user_id": current_user.id, "is_active": True}).to_list(100)
+
                 if group_col and pd.notna(row.get(group_col)):
                     group_val = str(row[group_col]).lower().strip()
                     for cat in categories:
@@ -1002,9 +1627,17 @@ async def import_csv(
                             
                 if not category_id:
                     desc_lower = description.lower()
+                    for rule in automation_rules:
+                        if rule['keyword'].lower() in desc_lower:
+                            category_id = rule['category_id']
+                            break
+                
+                # Fallback to simple hardcoded match if still no category (legacy support)
+                if not category_id:
+                    desc_lower = description.lower()
                     for cat in categories:
                         if cat['type'] == 'expense' and any(keyword in desc_lower for keyword in ['rent', 'utilities', 'electricity', 'water']):
-                            if 'rent' in cat['name'].lower():
+                            if 'rent' in cat['name'].lower() or 'utility' in cat['name'].lower():
                                 category_id = cat['id']
                                 break
                         elif cat['type'] == 'income' and any(keyword in desc_lower for keyword in ['salary', 'payment received', 'sales']):
@@ -1168,6 +1801,521 @@ async def get_monthly_trend(current_user: User = Depends(get_current_user)):
             continue
     
     return sorted(monthly_data.values(), key=lambda x: x['month'])
+
+@api_router.get("/reports/balance-sheet")
+async def get_balance_sheet(
+    as_of_date: Optional[str] = None,  # DD-MM-YYYY
+    current_user: User = Depends(get_current_user)
+):
+    if not as_of_date:
+        as_of_date = datetime.now().strftime('%d-%m-%Y')
+    
+    # Utility to compare dates
+    def get_date_obj(date_str):
+        try: return datetime.strptime(date_str, '%d-%m-%Y')
+        except: return datetime.min
+        
+    as_of_obj = get_date_obj(as_of_date)
+    
+    # Fetch accounts & transactions
+    accounts = await db.accounts.find({"user_id": current_user.id}, {"_id": 0}).to_list(1000)
+    transactions = await db.transactions.find({"user_id": current_user.id}, {"_id": 0}).to_list(100000)
+    
+    # Structure for response
+    results = {
+        "as_of_date": as_of_date,
+        "assets": {
+            "current_assets": {
+                "bank_accounts": [],
+                "cash_in_hand": [],
+                "total": 0
+            },
+            "total_assets": 0
+        },
+        "liabilities": {
+            "current_liabilities": {
+                "credit_cards": [],
+                "total": 0
+            },
+            "total_liabilities": 0
+        },
+        "equity": {
+            "net_income": 0,
+            "retained_earnings": 0,
+            "total_equity": 0
+        },
+        "total_liabilities_and_equity": 0,
+        "is_balanced": False
+    }
+    
+    # 1. Calculate Account Balances as of Date
+    for acc in accounts:
+        # Start with opening balance
+        balance = acc.get('opening_balance', 0)
+        
+        # Add historical transactions up to as_of_date
+        acc_txns = [t for t in transactions if t['account_id'] == acc['id'] and get_date_obj(t['date']) <= as_of_obj and t['type'] != 'opening']
+        
+        for txn in acc_txns:
+            if txn['type'] == 'credit':
+                balance += txn['amount']
+            else:
+                balance -= txn['amount']
+                
+        account_entry = {"name": acc['account_name'], "balance": balance, "bank": acc.get('bank_name')}
+        
+        # Categorize by type
+        if acc['account_type'] == "Bank":
+            results["assets"]["current_assets"]["bank_accounts"].append(account_entry)
+            results["assets"]["current_assets"]["total"] += balance
+        elif acc['account_type'] == "Cash":
+            results["assets"]["current_assets"]["cash_in_hand"].append(account_entry)
+            results["assets"]["current_assets"]["total"] += balance
+        elif acc['account_type'] == "Card":
+            # Credit cards are liabilities
+            results["liabilities"]["current_liabilities"]["credit_cards"].append(account_entry)
+            results["liabilities"]["current_liabilities"]["total"] += balance
+            
+    results["assets"]["total_assets"] = results["assets"]["current_assets"]["total"]
+    results["liabilities"]["total_liabilities"] = results["liabilities"]["current_liabilities"]["total"]
+    
+    # 2. Calculate Equity (Net Income = Total Income - Total Expense up to date)
+    relevant_txns = [t for t in transactions if get_date_obj(t['date']) <= as_of_obj and t['type'] != 'opening']
+    total_income = sum(t['amount'] for t in relevant_txns if t['type'] == 'credit')
+    total_expense = sum(t['amount'] for t in relevant_txns if t['type'] == 'debit')
+    
+    results["equity"]["net_income"] = total_income - total_expense
+    results["equity"]["retained_earnings"] = results["equity"]["net_income"]
+    results["equity"]["total_equity"] = results["equity"]["retained_earnings"]
+    
+    # 3. Balance Check
+    results["total_liabilities_and_equity"] = results["liabilities"]["total_liabilities"] + results["equity"]["total_equity"]
+    # Due to simplified accounting, they might not perfectly match if manual edits happened without double entry
+    # But for this system, it should theoretically align.
+    results["is_balanced"] = abs(results["assets"]["total_assets"] - results["total_liabilities_and_equity"]) < 0.01
+    
+    return results
+
+@api_router.get("/reports/cash-flow")
+async def get_cash_flow(
+    date_from: Optional[str] = None,  # DD-MM-YYYY
+    date_to: Optional[str] = None,    # DD-MM-YYYY
+    current_user: User = Depends(get_current_user)
+):
+    # Default to current Indian Fiscal Year (Apr 1 - Mar 31)
+    today = datetime.now()
+    if not date_from or not date_to:
+        if today.month < 4:
+            df = f"01-04-{today.year - 1}"
+            dt = f"31-03-{today.year}"
+        else:
+            df = f"01-04-{today.year}"
+            dt = f"31-03-{today.year + 1}"
+        date_from = date_from or df
+        date_to = date_to or dt
+
+    def get_date_obj(date_str):
+        try: return datetime.strptime(date_str, '%d-%m-%Y')
+        except: return datetime.min
+
+    from_obj = get_date_obj(date_from)
+    to_obj = get_date_obj(date_to)
+
+    # 1. Fetch Data
+    accounts = await db.accounts.find({"user_id": current_user.id, "account_type": {"$in": ["Bank", "Cash"]}}, {"_id": 0}).to_list(1000)
+    transactions = await db.transactions.find({"user_id": current_user.id}, {"_id": 0}).to_list(100000)
+    categories = await db.categories.find({"user_id": current_user.id}, {"_id": 0}).to_list(1000)
+    cat_map = {c['id']: c for c in categories}
+
+    # 2. Opening Cash Balance (Bank + Cash accounts only)
+    opening_cash = 0
+    account_ids = [a['id'] for a in accounts]
+    
+    for acc in accounts:
+        bal = acc.get('opening_balance', 0)
+        # Add credits/debits before date_from
+        historical = [t for t in transactions if t['account_id'] == acc['id'] and get_date_obj(t['date']) < from_obj and t['type'] != 'opening']
+        for txn in historical:
+            if txn['type'] == 'credit': bal += txn['amount']
+            else: bal -= txn['amount']
+        opening_cash += bal
+
+    # 3. Operating Activities (categorized income/expense within range)
+    op_items = {}
+    range_txns = [t for t in transactions if t['account_id'] in account_ids and from_obj <= get_date_obj(t['date']) <= to_obj and t['type'] != 'opening']
+    
+    for txn in range_txns:
+        cat_id = txn.get('category_id')
+        cat = cat_map.get(cat_id)
+        name = cat['name'] if cat else ("Other Income" if txn['type'] == 'credit' else "Other Expense")
+        
+        if name not in op_items:
+            op_items[name] = {"name": name, "category_type": cat['type'] if cat else txn['type'], "amount": 0}
+        
+        amt = txn['amount']
+        if txn['type'] == 'credit': op_items[name]['amount'] += amt
+        else: op_items[name]['amount'] -= amt
+
+    net_operating = sum(i['amount'] for i in op_items.values())
+
+    return {
+        "period": {"from": date_from, "to": date_to},
+        "operating_activities": {
+            "items": list(op_items.values()),
+            "net_cash": net_operating
+        },
+        "investing_activities": {"items": [], "net_cash": 0, "note": "Asset tracking not yet implemented"},
+        "financing_activities": {"items": [], "net_cash": 0, "note": "Loan tracking not yet implemented"},
+        "net_change_in_cash": net_operating,
+        "opening_cash_balance": opening_cash,
+        "closing_cash_balance": opening_cash + net_operating
+    }
+
+@api_router.get("/reports/gst-summary")
+async def get_gst_summary(
+    month: int,
+    year: int,
+    current_user: User = Depends(get_current_user)
+):
+    # Fetch all invoices for the month
+    # Format month/year for matching
+    month_str = f"{month:02d}"
+    year_str = str(year)
+    
+    # Simple regex or string match for the month-year
+    # Invoices/Transactions use DD-MM-YYYY
+    match_pattern = f"-{month_str}-{year_str}"
+    
+    invoices = await db.invoices.find({
+        "user_id": current_user.id,
+        "date": {"$regex": match_pattern},
+        "status": {"$in": ["paid", "sent"]}
+    }).to_list(1000)
+    
+    transactions = await db.transactions.find({
+        "user_id": current_user.id,
+        "date": {"$regex": match_pattern},
+        "type": "debit"
+    }).to_list(10000)
+    
+    # 1. Calculate Output Tax (Sales)
+    total_taxable_sales = 0
+    total_output_gst = 0
+    
+    for inv in invoices:
+        tax_amt = inv.get('tax_amount', 0)
+        total_output_gst += tax_amt
+        # Taxable value = total - tax
+        total_taxable_sales += (inv.get('total_amount', 0) - tax_amt)
+        
+    # 2. Calculate Input Tax Credit (ITC - Expenses)
+    # Filter for 'Expense' categories for better accuracy if possible
+    total_taxable_purchases = 0
+    total_itc = 0
+    
+    for txn in transactions:
+        # For prototype: Assume 18% GST if not specified in metadata
+        amt = txn.get('amount', 0)
+        metadata = txn.get('metadata', {})
+        
+        gst_amt = metadata.get('gst_amount')
+        if gst_amt is not None:
+            itc = float(gst_amt)
+        else:
+            # Reverse calculate from 18%
+            # Amount = Base + 18% Base = 1.18 * Base
+            # Tax = Amount - (Amount / 1.18)
+            itc = amt - (amt / 1.18)
+            
+        total_itc += itc
+        total_taxable_purchases += (amt - itc)
+        
+    return {
+        "period": f"{month_str}/{year_str}",
+        "gstr1": {
+            "total_taxable_value": round(total_taxable_sales, 2),
+            "total_gst_collected": round(total_output_gst, 2),
+            "invoice_count": len(invoices)
+        },
+        "gstr3b": {
+            "output_tax": round(total_output_gst, 2),
+            "input_tax_credit": round(total_itc, 2),
+            "net_gst_payable": round(max(0, total_output_gst - total_itc), 2),
+            "excess_itc": round(max(0, total_itc - total_output_gst), 2)
+        }
+    }
+
+# ==================== AUDIT & AUTOMATION ROUTES ====================
+
+@api_router.get("/audit-logs", response_model=List[AuditLog])
+async def get_audit_logs(current_user: User = Depends(get_current_user)):
+    # Recent 1000 logs
+    logs = await db.audit_logs.find({"user_id": current_user.id}).sort("timestamp", -1).to_list(1000)
+    for log in logs:
+        log.pop("_id", None)
+        if isinstance(log.get('timestamp'), str):
+            log['timestamp'] = datetime.fromisoformat(log['timestamp'])
+    return logs
+
+@api_router.post("/automation-rules", response_model=AutomationRule)
+async def create_automation_rule(rule_data: AutomationRuleCreate, current_user: User = Depends(get_current_user)):
+    rule = AutomationRule(
+        user_id=current_user.id,
+        **rule_data.model_dump()
+    )
+    rule_dict = rule.model_dump()
+    rule_dict['created_at'] = rule_dict['created_at'].isoformat()
+    await db.automation_rules.insert_one(rule_dict)
+    
+    await log_action(current_user.id, "create", "automation_rule", f"Created rule for keyword: {rule.keyword}")
+    return rule
+
+@api_router.get("/automation-rules", response_model=List[AutomationRule])
+async def get_automation_rules(current_user: User = Depends(get_current_user)):
+    rules = await db.automation_rules.find({"user_id": current_user.id}).to_list(100)
+    for r in rules:
+        r.pop("_id", None)
+        if isinstance(r.get('created_at'), str):
+            r['created_at'] = datetime.fromisoformat(r['created_at'])
+    return rules
+
+@api_router.delete("/automation-rules/{rule_id}")
+async def delete_automation_rule(rule_id: str, current_user: User = Depends(get_current_user)):
+    await db.automation_rules.delete_one({"id": rule_id, "user_id": current_user.id})
+    await log_action(current_user.id, "delete", "automation_rule", f"Deleted rule: {rule_id}")
+    return {"message": "Rule deleted"}
+
+@api_router.post("/automation-rules/apply-bulk")
+async def bulk_apply_rules(current_user: User = Depends(get_current_user)):
+    rules = await db.automation_rules.find({"user_id": current_user.id, "is_active": True}).to_list(100)
+    if not rules:
+        return {"message": "No active rules found"}
+    
+    # Fetch past uncategorized transactions
+    transactions = await db.transactions.find({
+        "user_id": current_user.id, 
+        "category_id": None
+    }).to_list(5000)
+    
+    updated_count = 0
+    for txn in transactions:
+        desc_lower = txn['description'].lower()
+        for rule in rules:
+            if rule['keyword'].lower() in desc_lower:
+                await db.transactions.update_one(
+                    {"id": txn['id']},
+                    {"$set": {"category_id": rule['category_id']}}
+                )
+                updated_count += 1
+                break
+                
+    await log_action(current_user.id, "bulk_apply", "automation", f"Applied rules to {updated_count} transactions")
+    return {"message": f"Successfully categorized {updated_count} transactions"}
+
+# ==================== DATA EXPORT & BACKUP ROUTES ====================
+
+@api_router.get("/export/all")
+async def export_all_data(current_user: User = Depends(get_current_user)):
+    # Fetch all collections for this user
+    clients = await db.clients.find({"user_id": current_user.id}, {"_id": 0}).to_list(10000)
+    accounts = await db.accounts.find({"user_id": current_user.id}, {"_id": 0}).to_list(10000)
+    categories = await db.categories.find({"user_id": current_user.id}, {"_id": 0}).to_list(10000)
+    transactions = await db.transactions.find({"user_id": current_user.id}, {"_id": 0}).to_list(100000)
+    invoices = await db.invoices.find({"user_id": current_user.id}, {"_id": 0}).to_list(10000)
+    
+    # Audit Logs (Bonus for comprehensive backup)
+    audit_logs = await db.audit_logs.find({"user_id": current_user.id}, {"_id": 0}).to_list(5000)
+    automation_rules = await db.automation_rules.find({"user_id": current_user.id}, {"_id": 0}).to_list(200)
+
+    # User basic info
+    user_data = await db.users.find_one({"id": current_user.id}, {"_id": 0, "password_hash": 0})
+
+    export_data = {
+        "export_version": "1.0",
+        "export_date": datetime.now(timezone.utc).isoformat(),
+        "app": "Vitta",
+        "user_id": current_user.id,
+        "user_info": {
+            "name": user_data.get("name"),
+            "email": user_data.get("email"),
+            "business_name": user_data.get("business_name")
+        },
+        "data": {
+            "clients": clients,
+            "accounts": accounts,
+            "categories": categories,
+            "transactions": transactions,
+            "invoices": invoices,
+            "audit_logs": audit_logs,
+            "automation_rules": automation_rules
+        },
+        "counts": {
+            "clients": len(clients),
+            "accounts": len(accounts),
+            "categories": len(categories),
+            "transactions": len(transactions),
+            "invoices": len(invoices)
+        }
+    }
+
+    content = json.dumps(export_data, default=str, indent=2)
+    filename = f"vitta_backup_{datetime.now().strftime('%Y%p%d_%H%M%S')}.json"
+    
+    await log_action(current_user.id, "export", "backup", "Full JSON backup exported")
+    
+    return StreamingResponse(
+        io.BytesIO(content.encode()),
+        media_type="application/json",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@api_router.get("/export/transactions")
+async def export_transactions(
+    format: str = "csv",  # "csv" or "excel"
+    current_user: User = Depends(get_current_user)
+):
+    # Fetch data
+    txns = await db.transactions.find(
+        {"user_id": current_user.id, "type": {"$ne": "opening"}}, 
+        {"_id": 0}
+    ).sort("date", -1).to_list(50000)
+    
+    if not txns:
+        raise HTTPException(status_code=404, detail="No transactions found to export")
+        
+    # Map accounts and categories for names
+    accounts = {a["id"]: a["account_name"] for a in await db.accounts.find({"user_id": current_user.id}).to_list(1000)}
+    categories = {c["id"]: c["name"] for c in await db.categories.find({"user_id": current_user.id}).to_list(1000)}
+    
+    processed_list = []
+    for t in txns:
+        processed_list.append({
+            "Date": t.get("date"),
+            "Description": t.get("description"),
+            "Account": accounts.get(t.get("account_id"), "Unknown"),
+            "Category": categories.get(t.get("category_id"), "Uncategorized"),
+            "Ledger": t.get("ledger_name", ""),
+            "Reference": t.get("reference_number", ""),
+            "Debit": t.get("amount", 0) if t.get("type") == "debit" else 0,
+            "Credit": t.get("amount", 0) if t.get("type") == "credit" else 0,
+            "Notes": t.get("notes", "")
+        })
+        
+    df = pd.DataFrame(processed_list)
+    
+    await log_action(current_user.id, "export", "transactions", f"Transactions exported as {format}")
+
+    if format.lower() == "excel":
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Transactions')
+            # Basic formatting could be added here if needed
+        output.seek(0)
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename=vitta_transactions_{datetime.now().strftime('%Y%m%d')}.xlsx"}
+        )
+    else:
+        # CSV
+        csv_content = df.to_csv(index=False)
+        return StreamingResponse(
+            io.BytesIO(csv_content.encode()),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=vitta_transactions_{datetime.now().strftime('%Y%m%d')}.csv"}
+        )
+
+@api_router.post("/import/restore")
+async def restore_from_backup(
+    file: UploadFile = File(...),
+    mode: str = "merge",  # "merge" or "replace"
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        contents = await file.read()
+        import_data = json.loads(contents)
+        
+        if import_data.get("app") != "Vitta" or "data" not in import_data:
+            raise HTTPException(status_code=400, detail="Invalid Vitta backup file")
+            
+        data = import_data["data"]
+        results = {}
+        
+        # Replace mode: wipe all data first
+        if mode == "replace":
+            cols = ["clients", "accounts", "categories", "transactions", "invoices", "automation_rules"]
+            for col in cols:
+                await db[col].delete_many({"user_id": current_user.id})
+            
+        # Target collections
+        collections = {
+            "clients": data.get("clients", []),
+            "accounts": data.get("accounts", []),
+            "categories": data.get("categories", []),
+            "transactions": data.get("transactions", []),
+            "invoices": data.get("invoices", []),
+            "automation_rules": data.get("automation_rules", [])
+        }
+        
+        for col_name, items in collections.items():
+            inserted = 0
+            for item in items:
+                # Ensure the data belongs to the current user
+                item["user_id"] = current_user.id
+                
+                if mode == "merge":
+                    # Check for existing ID
+                    exists = await db[col_name].find_one({"id": item["id"], "user_id": current_user.id})
+                    if exists: continue
+                
+                # Insert
+                await db[col_name].insert_one(item)
+                inserted += 1
+            results[col_name] = inserted
+            
+        await log_action(current_user.id, "import", "restore", f"Data restored using {mode} mode")
+        return {"message": "Data restored successfully", "results": results}
+        
+    except Exception as e:
+        logger.error(f"Restore error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Restore failed: {str(e)}")
+
+# ==================== GLOBAL SYSTEM CONFIG (UAC) ====================
+
+@app.on_event("startup")
+async def initialize_system_config():
+    """Ensure the global config exists in the database on startup"""
+    existing = await db.system_config.find_one({"id": "global_config"})
+    if not existing:
+        config = SystemConfig()
+        config_dict = config.model_dump()
+        config_dict['updated_at'] = config_dict['updated_at'].isoformat()
+        await db.system_config.insert_one(config_dict)
+        logger.info("Initialized global system configuration")
+
+@api_router.get("/system/config")
+async def get_system_config():
+    """Fetch global feature flags for the entire platform"""
+    config = await db.system_config.find_one({"id": "global_config"}, {"_id": 0})
+    if not config:
+        # Fallback to default if somehow missing
+        return SystemConfig().model_dump()
+    return config
+
+@api_router.post("/system/config")
+async def update_system_config(new_features: Dict[str, bool]):
+    """Update global feature flags - Affects every user on the platform"""
+    # Simply update the 'features' field and timestamp
+    await db.system_config.update_one(
+        {"id": "global_config"},
+        {
+            "$set": {
+                "features": new_features,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    return {"message": "Global configuration updated successfully"}
 
 # Global exception handler for debugging
 @app.exception_handler(Exception)

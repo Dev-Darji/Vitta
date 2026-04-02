@@ -83,21 +83,17 @@ const Clients = () => {
     <div data-clients className="space-y-6 pb-20">
       <FontStyle />
 
-      {/* ── Header ── */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pt-2">
+      <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-8 mt-2">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-[3px] h-5 bg-slate-800 rounded-full" />
-            <h1 className="text-[22px] font-bold tracking-tight text-slate-900 leading-none">Clients</h1>
-          </div>
-          <p className="text-[12px] text-slate-400 font-medium ml-[18px]">Manage business entities and client profiles.</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Clients Management</h1>
+          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">Registry of Business Entities & Profiles</p>
         </div>
 
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-slate-900 hover:bg-black text-white h-9 px-5 rounded-lg flex items-center gap-2 shadow-sm focus:ring-0">
+            <Button className="bg-slate-900 hover:bg-black text-white h-9 px-6 rounded-lg flex items-center gap-2 shadow-lg shadow-slate-200 font-bold text-[13px]">
               <Plus className="h-4 w-4" />
-              <span className="text-[13px] font-semibold translate-y-[-0.5px]">Add Client</span>
+              <span>Add Client</span>
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[440px] rounded-2xl border border-slate-100 shadow-2xl p-0 overflow-hidden bg-white">

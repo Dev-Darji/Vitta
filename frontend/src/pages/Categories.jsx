@@ -133,20 +133,16 @@ const Categories = () => {
     <div data-categories data-testid="groups-page" className="space-y-6 pb-20">
       <FontStyle />
 
-      {/* ── Header ── */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pt-2">
+      <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-8 mt-2">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-[3px] h-5 bg-slate-800 rounded-full" />
-            <h1 className="text-[22px] font-bold tracking-tight text-slate-900 leading-none">Groups</h1>
-          </div>
-          <p className="text-[12px] text-slate-400 font-medium ml-[18px]">Organise transactions into income and expense categories.</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Groups Management</h1>
+          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">Classification of Income & Expense Categories</p>
         </div>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
             <Button data-testid="add-group-button"
-              className="bg-slate-900 hover:bg-black text-white h-9 px-5 rounded-lg text-[13px] font-semibold shadow-sm flex items-center gap-2">
+              className="bg-slate-900 hover:bg-black text-white h-9 px-6 rounded-lg text-[13px] font-bold shadow-lg shadow-slate-200 flex items-center gap-2">
               <Plus className="h-4 w-4" />Add Group
             </Button>
           </DialogTrigger>
