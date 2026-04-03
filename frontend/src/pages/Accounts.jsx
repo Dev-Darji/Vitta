@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Edit, Wallet, Building2, CreditCard, Banknote, Calendar, Info, Loader2, ArrowRight } from 'lucide-react';
+import { Plus, Trash2, Edit, Wallet, Building2, CreditCard, Banknote, Calendar, Info, Loader2, ArrowRight, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -369,6 +369,27 @@ const Accounts = () => {
     finally { setClientSubmitting(false); }
   };
 
+  const handleImportAccounts = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const toastId = toast.loading(`Importing ${file.name}...`);
+    try {
+      const res = await api.post('/accounts/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success(res.data.message, { id: toastId });
+      fetchInitialData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Import failed', { id: toastId });
+    } finally {
+      e.target.value = ''; // Reset
+    }
+  };
+
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0);
 
   /* ─────────────────────── RENDER ─────────────────────── */
@@ -383,38 +404,56 @@ const Accounts = () => {
           <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">Financial Ledger Control & Balances</p>
         </div>
 
-        {/* ── Create Account Dialog ── */}
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-slate-900 hover:bg-black text-white h-9 px-6 rounded-lg flex items-center gap-2 shadow-lg shadow-slate-200 font-bold text-[13px]">
-              <Plus className="h-4 w-4" />
-              <span>Add Account</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[480px] rounded-2xl border border-slate-100 shadow-2xl p-0 overflow-hidden bg-white">
-            <div className="px-7 py-5 border-b border-slate-100">
-              <DialogHeader>
-                <DialogTitle className="text-[17px] font-bold text-slate-900">New Ledger Account</DialogTitle>
-                <p className="text-[11.5px] text-slate-400 mt-0.5">Initialize a new asset source for tracking.</p>
-              </DialogHeader>
-            </div>
-            <form onSubmit={handleCreateAccount} className="px-7 py-6 space-y-5">
-              <AccountFormFields
-                data={newAccount}
-                onChange={(patch) => setNewAccount(prev => ({ ...prev, ...patch }))}
-                clients={clients}
-              />
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} className="h-9 px-5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100">
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={submitting} className="h-9 px-6 rounded-lg bg-slate-900 text-white text-[13px] font-bold shadow-sm">
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Account'}
-                </Button>
+        <div className="flex items-center gap-3">
+          <input 
+            type="file" 
+            id="bulk-import-accounts" 
+            className="hidden" 
+            accept=".xlsx,.xls,.csv" 
+            onChange={handleImportAccounts}
+          />
+          <Button 
+            variant="outline" 
+            onClick={() => document.getElementById('bulk-import-accounts').click()}
+            className="h-9 px-4 rounded-lg text-[13px] font-bold border-slate-200 hover:bg-slate-50 flex items-center gap-2"
+          >
+            <Upload className="h-4 w-4 text-slate-400" />
+            Bulk Import
+          </Button>
+
+          {/* ── Create Account Dialog ── */}
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-slate-900 hover:bg-black text-white h-9 px-6 rounded-lg flex items-center gap-2 shadow-lg shadow-slate-200 font-bold text-[13px]">
+                <Plus className="h-4 w-4" />
+                <span>Add Account</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[480px] rounded-2xl border border-slate-100 shadow-2xl p-0 overflow-hidden bg-white">
+              <div className="px-7 py-5 border-b border-slate-100">
+                <DialogHeader>
+                  <DialogTitle className="text-[17px] font-bold text-slate-900">New Ledger Account</DialogTitle>
+                  <p className="text-[11.5px] text-slate-400 mt-0.5">Initialize a new asset source for tracking.</p>
+                </DialogHeader>
               </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+              <form onSubmit={handleCreateAccount} className="px-7 py-6 space-y-5">
+                <AccountFormFields
+                  data={newAccount}
+                  onChange={(patch) => setNewAccount(prev => ({ ...prev, ...patch }))}
+                  clients={clients}
+                />
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <Button type="button" variant="ghost" onClick={() => setIsOpen(false)} className="h-9 px-5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100">
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={submitting} className="h-9 px-6 rounded-lg bg-slate-900 text-white text-[13px] font-bold shadow-sm">
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Account'}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* ── Summary Stats ── */}

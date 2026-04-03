@@ -540,7 +540,7 @@ class PasswordUpdate(BaseModel):
     new_password: str
 
 class CompanyProfile(BaseModel):
-    user_id: str
+    user_id: Optional[str] = None
     company_name: str
     trade_name: Optional[str] = None
     gstin: Optional[str] = None
@@ -565,6 +565,7 @@ class CompanyProfile(BaseModel):
     ifsc_code: Optional[str] = None
     branch: Optional[str] = None
     logo_url: Optional[str] = None
+    bank_balance: float = 0.0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -1341,6 +1342,84 @@ async def delete_item(item_id: str, current_user: User = Depends(get_current_use
     await log_action(current_user.id, "delete", "item", f"Deleted item ID: {item_id}")
     return {"message": "Item deleted"}
 
+@api_router.post("/items/import")
+async def import_items(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
+        raise HTTPException(status_code=400, detail="Only Excel and CSV files are supported")
+    
+    try:
+        contents = await file.read()
+        if file.filename.lower().endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(contents))
+        else:
+            df = pd.read_excel(io.BytesIO(contents))
+        
+        # Normalize columns
+        df.columns = [str(c).strip().lower() for c in df.columns]
+        
+        # Column mapping
+        col_map = {
+            'name': ['item name', 'name', 'product', 'service', 'description', 'title', 'items'],
+            'hsn_sac': ['hsn', 'sac', 'hsn_sac', 'hsn/sac', 'hsn code', 'sac code', 'code'],
+            'sale_price': ['price', 'sale price', 'rate', 'unit price', 'amount', 'selling price', 'mrp'],
+            'tax_rate': ['gst', 'tax', 'tax rate', 'gst %', 'tax %', 'gst rate'],
+            'unit': ['unit', 'uom', 'measurement', 'measure'],
+            'item_type': ['type', 'item type', 'category', 'kind']
+        }
+        
+        items_to_create = []
+        for _, row in df.iterrows():
+            item_data = {
+                "user_id": current_user.id,
+                "name": "",
+                "description": "",
+                "hsn_sac": "",
+                "unit": "PCS",
+                "item_type": "Goods",
+                "tax_rate": 18.0,
+                "sale_price": 0.0,
+                "is_tax_inclusive": False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            for model_field, aliases in col_map.items():
+                match_found = False
+                for alias in aliases:
+                    if alias in df.columns:
+                        val = row[alias]
+                        if pd.isna(val) or val == '': continue
+                        
+                        if model_field in ['sale_price', 'tax_rate']:
+                            try:
+                                val_str = str(val).replace('₹', '').replace('%', '').replace(',', '').strip()
+                                item_data[model_field] = float(val_str)
+                            except: pass
+                        elif model_field == 'item_type':
+                            vt = str(val).capitalize()
+                            item_data['item_type'] = 'Service' if 'Service' in vt else 'Goods'
+                        else:
+                            item_data[model_field] = str(val)
+                        match_found = True
+                        break
+                if model_field == 'name' and not match_found: break
+
+            if item_data['name']:
+                items_to_create.append(item_data)
+        
+        if items_to_create:
+            await db.items.insert_many(items_to_create)
+            await log_action(current_user.id, "import", "items", f"Imported {len(items_to_create)} items from {file.filename}")
+            return {"message": f"Successfully imported {len(items_to_create)} items"}
+        else:
+            return {"message": "No valid items found. Ensure 'Item Name' or 'Name' column exists."}
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+
 # ==================== BANK ACCOUNT ROUTES ====================
 
 # ==================== BANK ACCOUNT ROUTES ====================
@@ -1436,8 +1515,137 @@ async def delete_account(account_id: str, current_user: User = Depends(get_curre
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Account not found")
     
-    await log_action(current_user.id, "delete", "account", f"Deleted account ID: {account_id}", account_id)
+    await log_action(current_user.id, "delete", "account", f"Deleted account ID: {account_id}")
     return {"message": "Account deleted successfully"}
+
+@api_router.post("/accounts/import")
+async def import_accounts(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
+        raise HTTPException(status_code=400, detail="Only Excel and CSV files are supported")
+    
+    try:
+        contents = await file.read()
+        if file.filename.lower().endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(contents))
+        else:
+            df = pd.read_excel(io.BytesIO(contents))
+        
+        # Normalize columns
+        df.columns = [str(c).strip().lower() for c in df.columns]
+        
+        # Fetch all clients to map names to IDs
+        all_clients = await db.clients.find({"user_id": current_user.id}).to_list(None)
+        client_map = {c['name'].lower(): str(c['id']) for c in all_clients}
+        
+        # Fuzzy column mapping
+        col_map = {
+            'account_name': ['account name', 'name', 'account', 'label', 'title'],
+            'client_name': ['client', 'customer', 'business', 'entity', 'organization'],
+            'account_type': ['type', 'account type', 'category'],
+            'bank_name': ['bank', 'bank name', 'institution'],
+            'account_number': ['account number', 'acc no', 'a/c', 'number'],
+            'opening_balance': ['balance', 'opening balance', 'initial', 'amount'],
+            'opening_balance_date': ['date', 'start date', 'as of', 'opening date']
+        }
+        
+        accounts_to_create = []
+        transactions_to_create = []
+        
+        for _, row in df.iterrows():
+            # Find Client ID
+            target_client_id = None
+            found_client_name = ""
+            for alias in col_map['client_name']:
+                if alias in df.columns:
+                    val = str(row[alias]).strip().lower()
+                    if val in client_map:
+                        target_client_id = client_map[val]
+                        found_client_name = val
+                        break
+            
+            if not target_client_id:
+                # If no client match, use first available client or skip
+                if all_clients:
+                    target_client_id = str(all_clients[0]['id'])
+                else:
+                    continue
+
+            acc_id = str(uuid.uuid4())
+            acc_data = {
+                "id": acc_id,
+                "user_id": current_user.id,
+                "client_id": target_client_id,
+                "account_name": "",
+                "account_type": "Bank",
+                "bank_name": "",
+                "account_number": "",
+                "balance": 0.0,
+                "opening_balance": 0.0,
+                "opening_balance_date": datetime.now(timezone.utc).isoformat().split('T')[0],
+                "currency": "INR",
+                "notes": "Imported",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            name_found = False
+            for model_field, aliases in col_map.items():
+                if model_field == 'client_name': continue
+                for alias in aliases:
+                    if alias in df.columns:
+                        val = row[alias]
+                        if pd.isna(val) or val == '': continue
+                        
+                        if model_field == 'opening_balance':
+                            try:
+                                val_str = str(val).replace('₹', '').replace(',', '').strip()
+                                acc_data['opening_balance'] = float(val_str)
+                                acc_data['balance'] = acc_data['opening_balance']
+                            except: pass
+                        elif model_field == 'account_name':
+                            acc_data['account_name'] = str(val)
+                            name_found = True
+                        elif model_field == 'account_type':
+                            t = str(val).capitalize()
+                            acc_data['account_type'] = t if t in ["Bank", "Cash", "Card"] else "Bank"
+                        elif model_field == 'opening_balance_date':
+                            try:
+                                # Simple date normalizing
+                                acc_data['opening_balance_date'] = pd.to_datetime(val).isoformat().split('T')[0]
+                            except: pass
+                        else:
+                            acc_data[model_field] = str(val)
+                        break
+            
+            if name_found:
+                accounts_to_create.append(acc_data)
+                
+                # Create Opening Transaction
+                transactions_to_create.append({
+                    "id": str(uuid.uuid4()),
+                    "user_id": current_user.id,
+                    "account_id": acc_id,
+                    "date": acc_data['opening_balance_date'],
+                    "description": "Opening Balance (Imported)",
+                    "amount": acc_data['opening_balance'],
+                    "type": "opening",
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                })
+        
+        if accounts_to_create:
+            await db.accounts.insert_many(accounts_to_create)
+            if transactions_to_create:
+                await db.transactions.insert_many(transactions_to_create)
+            
+            await log_action(current_user.id, "import", "accounts", f"Imported {len(accounts_to_create)} accounts and opening transactions")
+            return {"message": f"Successfully imported {len(accounts_to_create)} accounts"}
+        else:
+            return {"message": "No valid accounts found. Ensure 'Account Name' column exists."}
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
 
 @api_router.put("/accounts/{account_id}")
 async def update_account(account_id: str, account_data: BankAccountUpdate, current_user: User = Depends(get_current_user)):
@@ -1518,8 +1726,84 @@ async def delete_client(client_id: str, current_user: User = Depends(get_current
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Client not found")
     
-    await log_action(current_user.id, "delete", "client", f"Deleted client ID: {client_id}", client_id)
+    await log_action(current_user.id, "delete", "client", f"Deleted client ID: {client_id}")
     return {"message": "Client deleted successfully"}
+
+@api_router.post("/clients/import")
+async def import_clients(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
+        raise HTTPException(status_code=400, detail="Only Excel and CSV files are supported")
+    
+    try:
+        contents = await file.read()
+        if file.filename.lower().endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(contents))
+        else:
+            df = pd.read_excel(io.BytesIO(contents))
+        
+        # Normalize columns
+        df.columns = [str(c).strip().lower() for c in df.columns]
+        
+        # Column mapping
+        col_map = {
+            'name': ['client name', 'name', 'customer', 'company', 'organization', 'legal name', 'bill to'],
+            'gstin': ['gst', 'gstin', 'tax number', 'vat number', 'registration number'],
+            'business_type': ['type', 'business type', 'category', 'segment', 'kind'],
+            'address': ['address', 'office address', 'location', 'mailing address', 'street'],
+            'state': ['state', 'pos', 'place of supply', 'region', 'province'],
+            'notes': ['notes', 'remarks', 'description', 'comments'],
+            'email': ['email', 'email address', 'contact email'],
+            'phone': ['phone', 'mobile', 'contact number', 'telephone']
+        }
+        
+        clients_to_create = []
+        for _, row in df.iterrows():
+            client_id = str(uuid.uuid4())
+            client_data = {
+                "id": client_id,
+                "user_id": current_user.id,
+                "name": "",
+                "business_type": "Retail",
+                "gstin": None,
+                "address": "",
+                "state": "Gujarat",
+                "currency": "INR",
+                "country": "India",
+                "notes": "",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            name_found = False
+            for model_field, aliases in col_map.items():
+                for alias in aliases:
+                    if alias in df.columns:
+                        val = row[alias]
+                        if pd.isna(val) or val == '': continue
+                        
+                        if model_field == 'name':
+                            client_data['name'] = str(val)
+                            name_found = True
+                        elif model_field == 'gstin':
+                            client_data['gstin'] = str(val).upper()
+                        else:
+                            client_data[model_field] = str(val)
+                        break
+            
+            if name_found:
+                clients_to_create.append(client_data)
+        
+        if clients_to_create:
+            await db.clients.insert_many(clients_to_create)
+            await log_action(current_user.id, "import", "clients", f"Imported {len(clients_to_create)} clients from {file.filename}")
+            return {"message": f"Successfully imported {len(clients_to_create)} clients"}
+        else:
+            return {"message": "No valid clients found. Ensure 'Client Name' or 'Name' column exists."}
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
 
 # ==================== CATEGORY ROUTES ====================
 

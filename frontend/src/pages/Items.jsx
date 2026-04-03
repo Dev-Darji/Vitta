@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Loader2, Package, Tag, ShoppingBag, Edit3, Search, Info } from 'lucide-react';
+import { Plus, Trash2, Loader2, Package, Tag, ShoppingBag, Edit3, Search, Info, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -91,6 +91,27 @@ const Items = () => {
     item.hsn_sac.includes(searchQuery)
   );
 
+  const handleImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const toastId = toast.loading(`Importing ${file.name}...`);
+    try {
+      const res = await api.post('/items/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success(res.data.message, { id: toastId });
+      fetchItems();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Import failed', { id: toastId });
+    } finally {
+      e.target.value = ''; // Reset input
+    }
+  };
+
   return (
     <div className="space-y-6 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-4 mt-2">
@@ -109,6 +130,22 @@ const Items = () => {
               className="h-9 pl-9 rounded-lg border-slate-200 bg-white text-[13px] font-medium"
             />
           </div>
+
+          <input 
+            type="file" 
+            id="bulk-import-input" 
+            className="hidden" 
+            accept=".xlsx,.xls,.csv" 
+            onChange={handleImport}
+          />
+
+          <Button 
+            variant="outline" 
+            onClick={() => document.getElementById('bulk-import-input').click()}
+            className="h-9 px-4 rounded-lg text-[13px] font-bold border-slate-200 hover:bg-slate-50 flex items-center gap-2"
+          >
+            <Upload className="h-4 w-4 text-slate-400" />Bulk Import
+          </Button>
           <Dialog open={isOpen} onOpenChange={(val) => {
             setIsOpen(val);
             if (!val) {

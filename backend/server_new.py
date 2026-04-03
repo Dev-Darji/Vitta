@@ -508,7 +508,7 @@ class PasswordUpdate(BaseModel):
     new_password: str
 
 class CompanyProfile(BaseModel):
-    user_id: str
+    user_id: Optional[str] = None
     company_name: str
     trade_name: Optional[str] = None
     gstin: Optional[str] = None
@@ -533,6 +533,7 @@ class CompanyProfile(BaseModel):
     ifsc_code: Optional[str] = None
     branch: Optional[str] = None
     logo_url: Optional[str] = None
+    bank_balance: float = 0.0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

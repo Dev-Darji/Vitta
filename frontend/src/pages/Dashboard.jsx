@@ -109,16 +109,18 @@ const Dashboard = () => {
   const [categoryBreakdown, setCategoryBreakdown] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [invoiceSummary, setInvoiceSummary] = useState({ total_invoiced: 0, total_paid: 0, total_outstanding: 0, total_overdue: 0 });
+  const [myProfile, setMyProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { fetchDashboardData(); }, []);
 
   const fetchDashboardData = async () => {
     try {
-      const [statsRes, accountsRes, trendRes] = await Promise.all([
+      const [statsRes, accountsRes, trendRes, profileRes] = await Promise.all([
         api.get('/dashboard/stats'),
         api.get('/accounts'),
-        api.get('/reports/monthly-trend')
+        api.get('/reports/monthly-trend'),
+        api.get('/company-profile').catch(() => ({ data: null }))
       ]);
       
       const s = statsRes.data;
@@ -136,6 +138,7 @@ const Dashboard = () => {
         total_outstanding: s.receivable_total,
         total_overdue: s.outstanding_list.filter(i => i.status === 'overdue').reduce((acc, i) => acc + i.balance_due, 0)
       });
+      setMyProfile(profileRes.data);
     } catch { 
       toast.error('Failed to load real-world dashboard data'); 
     } finally { 
@@ -198,6 +201,45 @@ const Dashboard = () => {
           </Button>
         </div>
       </div>
+
+      {/* ── Profile Completion Banner ── */}
+      {!myProfile?.company_name && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-slate-950 p-4 rounded-2xl text-white flex flex-col md:flex-row items-center justify-between shadow-2xl shadow-emerald-950/20 mb-10 gap-6 relative overflow-hidden group border border-white/5"
+        >
+          {/* Subtle Dynamic Accents */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-[40px] pointer-events-none group-hover:bg-emerald-500/20 transition-all duration-1000" />
+          
+          <div className="flex items-center gap-4 relative z-10 px-1">
+            <div className="h-10 w-10 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center shadow-inner group-hover:bg-emerald-500/20 transition-colors">
+              <Sparkles className="h-5 w-5 text-emerald-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <div className="h-1.5 w-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 opacity-90">Action Required</p>
+              </div>
+              <h4 className="text-[15px] font-black tracking-tight leading-tight">Complete your Business Identity</h4>
+              <p className="text-[11px] font-medium text-slate-400 mt-0.5">Unlock Rule 46 Tax Invoicing and Compliance features.</p>
+            </div>
+          </div>
+
+          <motion.div
+            animate={{ scale: [1, 1.03, 1] }}
+            transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+            className="w-full md:w-auto relative z-10"
+          >
+            <Button 
+                onClick={() => navigate('/settings')} 
+                className="w-full md:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[11px] uppercase tracking-widest px-10 h-10 rounded-xl shadow-lg shadow-emerald-500/20 border-none transition-all active:scale-95"
+            >
+                Set Up Profile
+            </Button>
+          </motion.div>
+        </motion.div>
+      )}
 
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
