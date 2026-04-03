@@ -128,15 +128,20 @@ const Dashboard = () => {
         total_income: s.revenue_month,
         total_expense: s.expense_month,
         net_balance: s.revenue_month - s.expense_month,
-        transaction_count: s.recent_activity.length
+        transaction_count: s.transaction_count || 0
       });
       setAccounts(accountsRes.data);
       setMonthlyTrend(trendRes.data);
+      
+      const overdueSum = s.outstanding_list
+        ? s.outstanding_list.filter(i => i.status === 'overdue').reduce((acc, i) => acc + (i.balance_due || 0), 0)
+        : 0;
+
       setInvoiceSummary({
         total_invoiced: s.revenue_month + s.receivable_total,
         total_paid: s.revenue_month,
         total_outstanding: s.receivable_total,
-        total_overdue: s.outstanding_list.filter(i => i.status === 'overdue').reduce((acc, i) => acc + i.balance_due, 0)
+        total_overdue: overdueSum
       });
       setMyProfile(profileRes.data);
     } catch { 
@@ -183,8 +188,12 @@ const Dashboard = () => {
       {/* ── Page Header ── */}
       <div className="anim anim-1 flex flex-col md:flex-row justify-between items-end gap-6 mb-8 mt-2">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Dashboard</h1>
-          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">Consolidated Account Overview</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+            {myProfile?.company_name || 'Dashboard'}
+          </h1>
+          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+            {myProfile?.company_name ? 'Business Overview' : 'Consolidated Account Overview'}
+          </p>
         </div>
 
         {/* Portfolio metrics */}

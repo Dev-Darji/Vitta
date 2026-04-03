@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,8 +24,13 @@ const FieldLabel = ({ children }) => (
   </Label>
 );
 
+const scheduleIIIHeads = {
+  income: ["Revenue from Operations", "Other Income"],
+  expense: ["Cost of Materials", "Employee Benefits", "Finance Costs", "Depreciation", "Other Expenses"]
+};
+
 /* ─── Category Row ───────────────────────────────────────────────────────── */
-const CategoryRow = ({ category, onDelete, delay }) => (
+const CategoryRow = ({ category, onDelete, onEdit, delay }) => (
   <motion.div
     layout
     initial={{ opacity: 0, y: 6 }}
@@ -42,20 +47,33 @@ const CategoryRow = ({ category, onDelete, delay }) => (
       >
         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: category.color }} />
       </div>
-      <span className="text-[13.5px] font-medium text-slate-800">{category.name}</span>
+      <div className="flex flex-col">
+        <span className="text-[13.5px] font-medium text-slate-800">{category.name}</span>
+        {category.schedule_iii_head && (
+          <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">{category.schedule_iii_head}</span>
+        )}
+      </div>
     </div>
 
-    <button
-      onClick={() => onDelete(category.id)}
-      className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100"
-    >
-      <Trash2 className="h-3.5 w-3.5" />
-    </button>
+    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <button
+        onClick={() => onEdit(category)}
+        className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
+      >
+        <Edit2 className="h-3.5 w-3.5" />
+      </button>
+      <button
+        onClick={() => onDelete(category.id)}
+        className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
   </motion.div>
 );
 
 /* ─── Section Block ──────────────────────────────────────────────────────── */
-const CategorySection = ({ title, dot, categories, onDelete, emptyText }) => (
+const CategorySection = ({ title, dot, categories, onDelete, onEdit, emptyText }) => (
   <div className="space-y-3">
     {/* Section header */}
     <div className="flex items-center gap-2 px-1">
@@ -69,7 +87,7 @@ const CategorySection = ({ title, dot, categories, onDelete, emptyText }) => (
       <AnimatePresence mode="popLayout">
         {categories.length > 0 ? (
           categories.map((cat, i) => (
-            <CategoryRow key={cat.id} category={cat} onDelete={onDelete} delay={i * 0.03} />
+            <CategoryRow key={cat.id} category={cat} onDelete={onDelete} onEdit={onEdit} delay={i * 0.03} />
           ))
         ) : (
           <motion.div
@@ -92,8 +110,10 @@ const Categories = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [newCategory, setNewCategory] = useState({ name: '', type: 'expense', color: '#6366f1' });
+  const [newCategory, setNewCategory] = useState({ name: '', type: 'expense', color: '#6366f1', schedule_iii_head: 'Other Expenses' });
+  const [editingCategory, setEditingCategory] = useState(null);
 
   useEffect(() => { fetchCategories(); }, []);
 
@@ -102,7 +122,7 @@ const Categories = () => {
       setLoading(true);
       const res = await api.get('/categories');
       setCategories(res.data);
-    } catch { toast.error('Failed to load groups'); }
+    } catch { toast.error('Failed to load categories'); }
     finally { setLoading(false); }
   };
 
@@ -112,54 +132,72 @@ const Categories = () => {
     try {
       setSubmitting(true);
       await api.post('/categories', newCategory);
-      toast.success('Group created');
+      toast.success('Category created');
       setIsOpen(false);
-      setNewCategory({ name: '', type: 'expense', color: '#6366f1' });
+      setNewCategory({ name: '', type: 'expense', color: '#6366f1', schedule_iii_head: 'Other Expenses' });
       fetchCategories();
-    } catch { toast.error('Failed to create group'); }
+    } catch { toast.error('Failed to create category'); }
+    finally { setSubmitting(false); }
+  };
+
+  const handleUpdateCategory = async (e) => {
+    e.preventDefault();
+    if (!editingCategory.name.trim()) return;
+    try {
+      setSubmitting(true);
+      await api.put(`/categories/${editingCategory.id}`, editingCategory);
+      toast.success('Category updated');
+      setIsEditOpen(false);
+      fetchCategories();
+    } catch { toast.error('Failed to update category'); }
     finally { setSubmitting(false); }
   };
 
   const handleDeleteCategory = async (id) => {
-    if (!window.confirm('Delete this group?')) return;
-    try { await api.delete(`/categories/${id}`); toast.success('Group deleted'); fetchCategories(); }
-    catch { toast.error('Failed to delete group'); }
+    if (!window.confirm('Delete this category?')) return;
+    try { await api.delete(`/categories/${id}`); toast.success('Category deleted'); fetchCategories(); }
+    catch { toast.error('Failed to delete category'); }
+  };
+
+  const openEdit = (cat) => {
+    setEditingCategory({ ...cat });
+    setIsEditOpen(true);
   };
 
   const incomeCategories  = categories.filter(c => c.type === 'income');
   const expenseCategories = categories.filter(c => c.type === 'expense');
 
   return (
-    <div data-categories data-testid="groups-page" className="space-y-6 pb-20">
+    <div data-categories data-testid="categories-page" className="space-y-6 pb-20">
       <FontStyle />
 
       <div className="flex flex-col md:flex-row justify-between items-end gap-6 mb-8 mt-2">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Groups Management</h1>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Categories Management</h1>
           <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">Classification of Income & Expense Categories</p>
         </div>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="add-group-button"
+            <Button data-testid="add-category-button"
               className="bg-slate-900 hover:bg-black text-white h-9 px-6 rounded-lg text-[13px] font-bold shadow-lg shadow-slate-200 flex items-center gap-2">
-              <Plus className="h-4 w-4" />Add Group
+              <Plus className="h-4 w-4" />Add Category
             </Button>
           </DialogTrigger>
 
           <DialogContent className="sm:max-w-[380px] rounded-2xl border border-slate-100 shadow-2xl p-0 overflow-hidden bg-white">
             <div className="px-6 py-5 border-b border-slate-100">
               <DialogHeader>
-                <DialogTitle className="text-[17px] font-bold text-slate-900">New Group</DialogTitle>
+                <DialogTitle className="text-[17px] font-bold text-slate-900">New Category</DialogTitle>
                 <p className="text-[11.5px] text-slate-400 mt-0.5">Create a category for classifying transactions.</p>
               </DialogHeader>
             </div>
 
             <form onSubmit={handleCreateCategory} className="px-6 py-5 space-y-4">
               <div>
-                <FieldLabel>Group Name</FieldLabel>
+                <FieldLabel>Category Name</FieldLabel>
                 <Input
-                  data-testid="group-name-input"
+                  data-testid="category-name-input"
                   value={newCategory.name}
                   onChange={e => setNewCategory({ ...newCategory, name: e.target.value })}
                   required
@@ -171,7 +209,7 @@ const Categories = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <FieldLabel>Type</FieldLabel>
-                  <Select value={newCategory.type} onValueChange={v => setNewCategory({ ...newCategory, type: v })}>
+                  <Select value={newCategory.type} onValueChange={v => setNewCategory({ ...newCategory, type: v, schedule_iii_head: scheduleIIIHeads[v][0] })}>
                     <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
                       <SelectValue />
                     </SelectTrigger>
@@ -198,15 +236,18 @@ const Categories = () => {
                 </div>
               </div>
 
-              {/* Preview swatch */}
-              <div className="flex items-center gap-3 px-3 py-2.5 bg-slate-50 rounded-lg border border-slate-100">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${newCategory.color}18` }}>
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: newCategory.color }} />
-                </div>
-                <span className="text-[12.5px] font-medium text-slate-700">{newCategory.name || 'Preview'}</span>
-                <span className={`ml-auto text-[10.5px] font-medium px-2 py-0.5 rounded-md ${newCategory.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>
-                  {newCategory.type}
-                </span>
+              <div>
+                <FieldLabel>Schedule III Classification</FieldLabel>
+                <Select value={newCategory.schedule_iii_head} onValueChange={v => setNewCategory({ ...newCategory, schedule_iii_head: v })}>
+                  <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-slate-100">
+                    {scheduleIIIHeads[newCategory.type].map(head => (
+                      <SelectItem key={head} value={head} className="text-[13px]">{head}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
@@ -214,24 +255,102 @@ const Categories = () => {
                   className="h-9 px-5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100">
                   Cancel
                 </Button>
-                <Button data-testid="create-group-submit" type="submit" disabled={submitting}
+                <Button data-testid="create-category-submit" type="submit" disabled={submitting}
                   className="h-9 px-6 rounded-lg bg-primary text-white text-[13px] font-semibold shadow-sm">
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Group'}
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Category'}
                 </Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Dialog */}
+        {editingCategory && (
+          <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+            <DialogContent className="sm:max-w-[380px] rounded-2xl border border-slate-100 shadow-2xl p-0 overflow-hidden bg-white">
+              <div className="px-6 py-5 border-b border-slate-100">
+                <DialogHeader>
+                  <DialogTitle className="text-[17px] font-bold text-slate-900">Edit Category</DialogTitle>
+                </DialogHeader>
+              </div>
+
+              <form onSubmit={handleUpdateCategory} className="px-6 py-5 space-y-4">
+                <div>
+                  <FieldLabel>Category Name</FieldLabel>
+                  <Input
+                    value={editingCategory.name}
+                    onChange={e => setEditingCategory({ ...editingCategory, name: e.target.value })}
+                    required
+                    className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <FieldLabel>Type</FieldLabel>
+                    <Select value={editingCategory.type} onValueChange={v => setEditingCategory({ ...editingCategory, type: v, schedule_iii_head: scheduleIIIHeads[v][0] })}>
+                      <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-slate-100">
+                        <SelectItem value="income"  className="text-[13px]">Income</SelectItem>
+                        <SelectItem value="expense" className="text-[13px]">Expense</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <FieldLabel>Colour</FieldLabel>
+                    <div className="flex items-center gap-2.5 h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg cursor-pointer">
+                      <input
+                        type="color"
+                        value={editingCategory.color}
+                        onChange={e => setEditingCategory({ ...editingCategory, color: e.target.value })}
+                        className="w-5 h-5 rounded border-none bg-transparent cursor-pointer"
+                      />
+                      <span className="text-[11.5px] font-medium text-slate-500 uppercase">
+                        {editingCategory.color}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <FieldLabel>Schedule III Classification</FieldLabel>
+                  <Select value={editingCategory.schedule_iii_head} onValueChange={v => setEditingCategory({ ...editingCategory, schedule_iii_head: v })}>
+                    <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-slate-100">
+                      {scheduleIIIHeads[editingCategory.type].map(head => (
+                        <SelectItem key={head} value={head} className="text-[13px]">{head}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                  <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}
+                    className="h-9 px-5 rounded-lg text-[13px] font-medium text-slate-500 hover:bg-slate-100">
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={submitting}
+                    className="h-9 px-6 rounded-lg bg-primary text-white text-[13px] font-semibold">
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Changes'}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
-      {/* ── Content ── */}
       {loading ? (
         <div className="flex items-center justify-center py-32">
           <Loader2 className="h-7 w-7 text-primary/30 animate-spin" />
         </div>
       ) : (
         <>
-          {/* Summary bar */}
           <div className="flex items-center gap-4 px-5 py-3 bg-white rounded-xl border border-slate-100 shadow-sm w-fit">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-emerald-400" />
@@ -248,18 +367,20 @@ const Categories = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <CategorySection
-              title="Income Groups"
+              title="Income Categories"
               dot="bg-emerald-400"
               categories={incomeCategories}
               onDelete={handleDeleteCategory}
-              emptyText="No income groups yet"
+              onEdit={openEdit}
+              emptyText="No income categories yet"
             />
             <CategorySection
-              title="Expense Groups"
+              title="Expense Categories"
               dot="bg-rose-400"
               categories={expenseCategories}
               onDelete={handleDeleteCategory}
-              emptyText="No expense groups yet"
+              onEdit={openEdit}
+              emptyText="No expense categories yet"
             />
           </div>
         </>

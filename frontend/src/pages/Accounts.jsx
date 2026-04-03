@@ -48,12 +48,13 @@ const AccountFormFields = ({ data, onChange, isEdit = false, clients = [] }) => 
     <div className="grid grid-cols-2 gap-4">
       {!isEdit && (
         <div>
-          <FieldLabel>Linked Client</FieldLabel>
+          <FieldLabel>Linked Client (Optional)</FieldLabel>
           <Select value={data.client_id} onValueChange={(val) => onChange({ client_id: val })}>
             <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
-              <SelectValue />
+              <SelectValue placeholder="Select Client (Optional)" />
             </SelectTrigger>
             <SelectContent className="rounded-xl border-slate-100">
+              <SelectItem value="null" className="text-[13px] text-slate-400 italic">None / Internal</SelectItem>
               {clients.map(c => (
                 <SelectItem key={c.id} value={c.id} className="text-[13px]">
                   {c.name}
@@ -287,7 +288,7 @@ const Accounts = () => {
     bank_name: '',
     account_number: '',
     opening_balance: 0,
-    opening_balance_date: new Date().toISOString().split('T')[0],
+    opening_balance_date: new Date().toLocaleDateString('en-GB').split('/').join('-'),
     currency: 'INR',
     notes: ''
   });
@@ -322,10 +323,14 @@ const Accounts = () => {
 
   const handleCreateAccount = async (e) => {
     e.preventDefault();
-    if (!newAccount.client_id) { toast.error('Select a client'); return; }
+    if (!newAccount.account_name) { toast.error('Account name is required'); return; }
+    const payload = {
+      ...newAccount,
+      client_id: newAccount.client_id === 'null' ? null : (newAccount.client_id || null)
+    };
     try {
       setSubmitting(true);
-      await api.post('/accounts', newAccount);
+      await api.post('/accounts', payload);
       toast.success('Account created');
       setIsOpen(false);
       setNewAccount({ client_id: clients[0]?.id || '', account_name: '', account_type: 'Bank', bank_name: '', account_number: '', opening_balance: 0, opening_balance_date: new Date().toISOString().split('T')[0], currency: 'INR', notes: '' });

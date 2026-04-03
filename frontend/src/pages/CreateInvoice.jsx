@@ -32,8 +32,8 @@ const CreateInvoice = () => {
     const [formData, setFormData] = useState({
         client_id: '',
         invoice_number: 'AUTO',
-        invoice_date: new Date().toISOString().split('T')[0],
-        due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        invoice_date: new Date().toLocaleDateString('en-GB').split('/').join('-'),
+        due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB').split('/').join('-'),
         invoice_type: 'Tax Invoice',
         place_of_supply: '',
         billing_address: '',
@@ -99,11 +99,13 @@ const CreateInvoice = () => {
         const newItem = {
             item_id: templateItem.id,
             name: templateItem.name,
+            description: templateItem.description || '',
             hsn_sac: templateItem.hsn_sac,
             quantity: 1,
             unit: templateItem.unit,
             rate: templateItem.sale_price,
             tax_rate: templateItem.tax_rate,
+            item_type: templateItem.item_type,
             discount_percent: 0,
             taxable_value: 0,
             cgst_rate: 0, cgst_amount: 0,
@@ -169,7 +171,16 @@ const CreateInvoice = () => {
         const grandTotal = Math.round(grandTotalRaw);
         const roundOff = grandTotal - grandTotalRaw;
 
-        return { items: updatedItems, subtotal, cgst_total, sgst_total, igst_total, totalTax, grandTotal, roundOff };
+        // Group by HSN for UI summary
+        const hsnMap = {};
+        updatedItems.forEach(item => {
+            const h = item.hsn_sac;
+            if (!hsnMap[h]) hsnMap[h] = { hsn: h, taxable: 0, tax: 0, rate: item.tax_rate };
+            hsnMap[h].taxable += item.taxable_value;
+            hsnMap[h].tax += (item.cgst_amount + item.sgst_amount + item.igst_amount);
+        });
+
+        return { items: updatedItems, subtotal, cgst_total, sgst_total, igst_total, totalTax, grandTotal, roundOff, hsnSummary: Object.values(hsnMap) };
     }, [formData.items, formData.place_of_supply, myProfile]);
 
     const handleSave = async () => {
@@ -342,10 +353,17 @@ const CreateInvoice = () => {
                                                 <div className="h-8 w-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center shrink-0">
                                                     {item.unit === 'SAC' ? <ShoppingBag className="h-3.5 w-3.5 text-emerald-500" /> : <Package className="h-3.5 w-3.5 text-blue-500" />}
                                                 </div>
-                                                <div className="min-w-0">
+                                                <div className="min-w-0 flex-1">
                                                     <p className="text-[12.5px] font-bold text-slate-900 truncate">{item.name}</p>
-                                                    <div className="flex items-center gap-2">
+                                                    <Input 
+                                                        placeholder="Add item description..." 
+                                                        value={item.description}
+                                                        onChange={(e) => updateItemRow(idx, 'description', e.target.value)}
+                                                        className="h-6 mt-0.5 border-none bg-transparent p-0 text-[10px] text-slate-400 font-medium focus-visible:ring-0 placeholder:text-slate-300"
+                                                    />
+                                                    <div className="flex items-center gap-2 mt-1">
                                                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">HSN: {item.hsn_sac}</span>
+                                                        <span className="h-1 w-1 rounded-full bg-slate-200" />
                                                         <span className="text-[9px] font-black text-primary uppercase tracking-tighter">{item.tax_rate}% GST</span>
                                                     </div>
                                                 </div>
@@ -394,6 +412,32 @@ const CreateInvoice = () => {
                             </AnimatePresence>
                         </div>
                     </div>
+
+                    {/* HSN Summary Logic */}
+                    {calculatedData.hsnSummary.length > 0 && (
+                        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm overflow-hidden relative">
+                             <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                                <ShieldCheck className="h-16 w-16 text-slate-900" />
+                            </div>
+                            <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <Landmark className="h-4 w-4 text-primary" /> HSN / SAC Tax Summary
+                            </h3>
+                            <div className="grid grid-cols-12 gap-4 px-2 py-2 border-b border-slate-50">
+                                <div className="col-span-3 text-[9px] font-black text-slate-400 uppercase tracking-widest">HSN Code</div>
+                                <div className="col-span-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Taxable Value</div>
+                                <div className="col-span-2 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Rate</div>
+                                <div className="col-span-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">GST Amount</div>
+                            </div>
+                            {calculatedData.hsnSummary.map((sum, i) => (
+                                <div key={i} className="grid grid-cols-12 gap-4 px-2 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
+                                    <div className="col-span-3 text-[11px] font-bold text-slate-900">{sum.hsn}</div>
+                                    <div className="col-span-3 text-[11px] font-bold text-slate-600 text-right">₹{sum.taxable.toLocaleString()}</div>
+                                    <div className="col-span-2 text-[11px] font-bold text-slate-400 text-center">{sum.rate}%</div>
+                                    <div className="col-span-4 text-[11px] font-black text-emerald-600 text-right">₹{sum.tax.toLocaleString()}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
                     {/* Footer Details */}
                     <div className="grid grid-cols-2 gap-6">

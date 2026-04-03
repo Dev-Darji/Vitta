@@ -18,6 +18,7 @@ const Items = () => {
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingItem, setEditingItem] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
   
   const initialItemState = {
     name: '',
@@ -69,6 +70,26 @@ const Items = () => {
       toast.success('Item deleted'); 
       fetchItems(); 
     } catch { toast.error('Failed to delete item'); }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Permanently delete ${selectedIds.length} items?`)) return;
+    try {
+      setSubmitting(true);
+      await api.post('/items/bulk-delete', { item_ids: selectedIds });
+      toast.success(`${selectedIds.length} items purged`);
+      setSelectedIds([]);
+      fetchItems();
+    } catch { toast.error('Bulk delete failed'); }
+    finally { setSubmitting(false); }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredItems.length && filteredItems.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredItems.map(i => i.id));
+    }
   };
 
   const handleEdit = (item) => {
@@ -146,6 +167,17 @@ const Items = () => {
           >
             <Upload className="h-4 w-4 text-slate-400" />Bulk Import
           </Button>
+
+          {selectedIds.length > 0 && (
+            <Button 
+              variant="destructive" 
+              onClick={handleBulkDelete}
+              className="h-9 px-4 rounded-lg text-[13px] font-bold flex items-center gap-2 animate-in fade-in zoom-in duration-200"
+            >
+              <Trash2 className="h-4 w-4" /> Delete ({selectedIds.length})
+            </Button>
+          )}
+
           <Dialog open={isOpen} onOpenChange={(val) => {
             setIsOpen(val);
             if (!val) {
@@ -270,9 +302,18 @@ const Items = () => {
           <Table>
             <TableHeader className="bg-slate-50/50">
               <TableRow className="hover:bg-transparent border-slate-100">
+                <TableHead className="w-12 h-12 text-center">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                    checked={selectedIds.length === filteredItems.length && filteredItems.length > 0}
+                    onChange={toggleSelectAll}
+                  />
+                </TableHead>
                 <TableHead className="text-[10px] font-black text-slate-400 uppercase tracking-widest h-12">Item Detail</TableHead>
+                <TableHead className="text-[10px] font-black text-slate-400 uppercase tracking-widest h-12">Type</TableHead>
                 <TableHead className="text-[10px] font-black text-slate-400 uppercase tracking-widest h-12">HSN/SAC</TableHead>
-                <TableHead className="text-[10px] font-black text-slate-400 uppercase tracking-widest h-12">GST Rate</TableHead>
+                <TableHead className="text-[10px] font-black text-slate-400 uppercase tracking-widest h-12 text-center">Tax Rate</TableHead>
                 <TableHead className="text-[10px] font-black text-slate-400 uppercase tracking-widest h-12 text-right">Selling Price</TableHead>
                 <TableHead className="text-[10px] font-black text-slate-400 uppercase tracking-widest h-12 text-right">Actions</TableHead>
               </TableRow>
@@ -280,7 +321,15 @@ const Items = () => {
             <TableBody>
               {filteredItems.length > 0 ? (
                 filteredItems.map(item => (
-                  <TableRow key={item.id} className="hover:bg-slate-50 transition-colors border-slate-50">
+                  <TableRow key={item.id} className={`${selectedIds.includes(item.id) ? 'bg-indigo-50/50 hover:bg-indigo-50' : 'hover:bg-slate-50'} transition-colors border-slate-50`}>
+                    <TableCell className="text-center">
+                       <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                        checked={selectedIds.includes(item.id)}
+                        onChange={() => setSelectedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${item.item_type === 'Goods' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
@@ -293,11 +342,16 @@ const Items = () => {
                       </div>
                     </TableCell>
                     <TableCell>
+                       <Badge variant="secondary" className={`bg-white border text-[9px] font-bold uppercase tracking-tighter ${item.item_type === 'Goods' ? 'text-blue-600 border-blue-100' : 'text-emerald-600 border-emerald-100'}`}>
+                        {item.item_type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
                       <Badge variant="outline" className="rounded-md border-slate-100 bg-slate-50 text-slate-600 font-bold text-[10px]">
                         {item.hsn_sac}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <span className="text-[12.5px] font-black text-slate-700">{item.tax_rate}%</span>
                     </TableCell>
                     <TableCell className="text-right">
@@ -320,7 +374,7 @@ const Items = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-48 text-center bg-slate-50/30">
+                  <TableCell colSpan={7} className="h-48 text-center bg-slate-50/30">
                     <div className="flex flex-col items-center gap-2 opacity-30">
                       <Package className="h-10 w-10 text-slate-200" />
                       <p className="text-[13px] font-bold text-slate-900">No items created yet</p>

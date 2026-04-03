@@ -124,6 +124,95 @@ const Settings = () => {
     } catch { toast.error('Failed to load user data'); }
   };
 
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.put('/user/profile', profileData);
+      toast.success('Profile preferences saved');
+      fetchUser();
+    } catch { toast.error('Failed to update profile'); }
+    finally { setLoading(false); }
+  };
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (passwordData.new_password !== passwordData.confirm_password) {
+      toast.error("Passwords don't match");
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.put('/user/password', {
+        current_password: passwordData.current_password,
+        new_password: passwordData.new_password
+      });
+      toast.success('Password updated successfully');
+      setPasswordData({ current_password: '', new_password: '', confirm_password: '' });
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to update password');
+    } finally { setLoading(false); }
+  };
+
+  const handleRestore = async () => {
+    if (!restoreFile) {
+      toast.error("Please select a backup file");
+      return;
+    }
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', restoreFile);
+      await api.post(`/import/restore?mode=${restoreMode}`, formData);
+      toast.success('System state restored successfully');
+      setIsRestoreOpen(false);
+      window.location.reload(); // Reload to refresh all context
+    } catch (e) {
+      toast.error("Restore failed: Invalid backup file");
+    } finally { setLoading(false); }
+  };
+
+  const handleExportJson = async () => {
+    try {
+      const response = await api.get('/export/all');
+      const blob = new Blob([JSON.stringify(response.data)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `vitta_backup_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success("Backup generated");
+    } catch { toast.error("Export failed"); }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const response = await api.get('/export/transactions?format=excel', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `vitta_transactions_${new Date().toISOString().split('T')[0]}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch { toast.error("Excel export failed"); }
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      const response = await api.get('/export/transactions?format=csv', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `vitta_transactions_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch { toast.error("CSV export failed"); }
+  };
+
   const handleUpdateCompany = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -147,7 +236,7 @@ const Settings = () => {
   ];
 
   return (
-    <div data-settings className="w-full pb-24 space-y-8 pr-4">
+    <div data-settings className="w-full pb-24 space-y-8">
       <FontStyle />
       
       {/* ── Page Header ── */}
@@ -158,7 +247,7 @@ const Settings = () => {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 items-start">
+      <div className="flex flex-col lg:flex-row gap-8">
         
         {/* ── Sidebar Nav ── */}
         <div className="inline-flex w-full lg:w-72 flex-row lg:flex-col p-1.5 bg-slate-100/60 rounded-2xl border border-slate-100 overflow-x-auto lg:overflow-visible no-scrollbar">
@@ -441,7 +530,7 @@ const Settings = () => {
                          <div>
                             <p className="text-[11px] font-black text-slate-900 uppercase tracking-[.15em] mb-4">Export Protocol</p>
                             <div className="space-y-3">
-                               <Button onClick={() => toast.info('Generating JSON backup...')} className="w-full justify-between h-12 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-100 text-slate-900 px-5 group">
+                               <Button onClick={handleExportJson} className="w-full justify-between h-12 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-100 text-slate-900 px-5 group">
                                  <div className="flex items-center gap-3">
                                    <FileJson className="h-4 w-4 text-indigo-500" />
                                    <span className="text-[12px] font-bold">System Backup (.json)</span>
@@ -449,10 +538,10 @@ const Settings = () => {
                                  <Download className="h-3.5 w-3.5 opacity-30 group-hover:opacity-100" />
                                </Button>
                                <div className="grid grid-cols-2 gap-3">
-                                  <Button onClick={() => toast.info('Preparing Excel export...')} variant="outline" className="h-12 rounded-xl border-slate-100 font-bold text-[11.5px] hover:bg-emerald-50 hover:text-emerald-600">
+                                  <Button onClick={handleExportExcel} variant="outline" className="h-12 rounded-xl border-slate-100 font-bold text-[11.5px] hover:bg-emerald-50 hover:text-emerald-600">
                                     <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
                                   </Button>
-                                  <Button onClick={() => toast.info('Preparing CSV export...')} variant="outline" className="h-12 rounded-xl border-slate-100 font-bold text-[11.5px] hover:bg-blue-50 hover:text-blue-600">
+                                  <Button onClick={handleExportCsv} variant="outline" className="h-12 rounded-xl border-slate-100 font-bold text-[11.5px] hover:bg-blue-50 hover:text-blue-600">
                                     <FileSpreadsheet className="h-4 w-4 mr-2" /> CSV
                                   </Button>
                                </div>
@@ -507,24 +596,24 @@ const Settings = () => {
                        </div>
                     </div>
 
-                    <form className="space-y-6">
+                    <form onSubmit={handleUpdatePassword} className="space-y-6">
                        <div className="space-y-1.5">
                          <Label className="text-[10px] font-black text-white/40 uppercase tracking-widest px-1">Current Password</Label>
-                         <Input type="password" placeholder="••••••••••••" className="h-12 rounded-xl bg-white/5 border-white/10 font-bold focus:bg-white/[0.08]" />
+                         <Input type="password" value={passwordData.current_password} onChange={e => setPasswordData({...passwordData, current_password: e.target.value})} placeholder="••••••••••••" className="h-12 rounded-xl bg-white/5 border-white/10 font-bold focus:bg-white/[0.08]" required />
                        </div>
                        <Separator className="bg-white/5" />
                        <div className="space-y-4">
                           <div className="space-y-1.5">
                              <Label className="text-[10px] font-black text-white/40 uppercase tracking-widest px-1">New Access Key</Label>
-                             <Input type="password" placeholder="Create robust password" className="h-12 rounded-xl bg-white/5 border-white/10 font-bold focus:bg-white/[0.08]" />
+                             <Input type="password" value={passwordData.new_password} onChange={e => setPasswordData({...passwordData, new_password: e.target.value})} placeholder="Create robust password" className="h-12 rounded-xl bg-white/5 border-white/10 font-bold focus:bg-white/[0.08]" required />
                           </div>
                           <div className="space-y-1.5">
                              <Label className="text-[10px] font-black text-white/40 uppercase tracking-widest px-1">Verify Key</Label>
-                             <Input type="password" placeholder="Repeat new password" className="h-12 rounded-xl bg-white/5 border-white/10 font-bold focus:bg-white/[0.08]" />
+                             <Input type="password" value={passwordData.confirm_password} onChange={e => setPasswordData({...passwordData, confirm_password: e.target.value})} placeholder="Repeat new password" className="h-12 rounded-xl bg-white/5 border-white/10 font-bold focus:bg-white/[0.08]" required />
                           </div>
                        </div>
-                       <Button className="w-full h-12 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-black text-[12px] uppercase tracking-widest shadow-xl shadow-indigo-950/20 mt-4">
-                         Update Credentials
+                       <Button type="submit" disabled={loading} className="w-full h-12 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-black text-[12px] uppercase tracking-widest shadow-xl shadow-indigo-950/20 mt-4">
+                         {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Update Credentials"}
                        </Button>
                     </form>
                   </div>
@@ -545,10 +634,10 @@ const Settings = () => {
                        </div>
                     </div>
 
-                    <form className="space-y-6">
+                    <form onSubmit={handleUpdateProfile} className="space-y-6">
                        <div className="space-y-1.5">
                          <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Owner / Full Name</Label>
-                         <Input value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value})} className="h-12 rounded-xl border-slate-100 bg-slate-50 font-bold" />
+                         <Input value={profileData.name} onChange={e => setProfileData({...profileData, name: e.target.value})} className="h-12 rounded-xl border-slate-100 bg-slate-50 font-bold" required />
                        </div>
                        <div className="space-y-1.5">
                          <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Registered Email</Label>
@@ -558,8 +647,8 @@ const Settings = () => {
                          <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Business Title (Public)</Label>
                          <Input value={profileData.business_name} onChange={e => setProfileData({...profileData, business_name: e.target.value})} placeholder="e.g. CEO, Principal Partner" className="h-12 rounded-xl border-slate-100 bg-slate-50 font-bold" />
                        </div>
-                       <Button className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-black font-black text-[11px] uppercase tracking-widest shadow-xl shadow-slate-100 mt-4 transition-all active:scale-[0.98]">
-                         Save Preferences
+                       <Button type="submit" disabled={loading} className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-black font-black text-[11px] uppercase tracking-widest shadow-xl shadow-slate-100 mt-4 transition-all active:scale-[0.98]">
+                         {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Save Preferences"}
                        </Button>
                     </form>
                   </div>

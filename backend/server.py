@@ -27,6 +27,7 @@ import io
 import PyPDF2
 import re
 import json
+from bson import ObjectId
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -215,7 +216,7 @@ class TokenResponse(BaseModel):
     user: User
 
 class BankAccountCreate(BaseModel):
-    client_id: str
+    client_id: Optional[str] = None
     account_name: str
     account_type: str # "Bank", "Cash", "Card"
     bank_name: Optional[str] = None
@@ -355,8 +356,8 @@ class Invoice(BaseModel):
     terms: Optional[str] = None
     irn: Optional[str] = None # For E-Invoice
     signed_qr_code: Optional[str] = None # For E-Invoice
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    amount_paid: float = 0.0
+    balance_due: float = 0.0
     currency: str = "INR"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
@@ -712,8 +713,8 @@ async def get_schedule_iii_pnl(
     # Expenses (Employee Benefits, Finance costs, etc)
     expense_categories = await db.categories.find({"user_id": current_user.id, "type": "expense"}).to_list(1000)
     
-    income_map = {str(c["_id"]): c for c in income_categories}
-    expense_map = {str(c["_id"]): c for c in expense_categories}
+    income_map = {c["id"]: c for c in income_categories if "id" in c}
+    expense_map = {c["id"]: c for c in expense_categories if "id" in c}
     
     # Aggregation
     revenue_ops = 0
@@ -725,7 +726,20 @@ async def get_schedule_iii_pnl(
     depreciation = 0
     other_expenses = 0
     
+    # Helper for date parsing
+    def parse_date(d_str):
+        if not d_str: return None
+        try: return datetime.strptime(d_str, "%d-%m-%Y").date()
+        except: return None
+
+    start_date = parse_date(date_from)
+    end_date = parse_date(date_to)
+
     for tx in transactions:
+        tx_date = parse_date(tx.get("date"))
+        if start_date and tx_date and tx_date < start_date: continue
+        if end_date and tx_date and tx_date > end_date: continue
+
         amount = tx["amount"]
         cid = tx.get("category_id")
         
@@ -777,58 +791,74 @@ async def get_schedule_iii_bs(
     """
     Balance Sheet (Schedule III)
     """
-    # Simply mapping existing logic to Schedule III heads
     accounts = await db.accounts.find({"user_id": current_user.id}).to_list(100)
     
-    cash_equivalents = sum(a["balance"] for a in accounts if a["account_type"] in ["Bank", "Cash"])
-    current_loans = sum(abs(a["balance"]) for a in accounts if a["account_type"] == "Card" and a["balance"] < 0)
+    cash_equivalents = sum(a.get("balance", 0) for a in accounts if a.get("account_type") in ["Bank", "Cash"])
+    short_term_borrowings = sum(abs(a.get("balance", 0)) for a in accounts if a.get("account_type") == "Card" and a.get("balance", 0) < 0)
     
     # Calculate Equity from all time P&L
-    all_income = await db.transactions.find({"user_id": current_user.id, "type": "credit"}).to_list(100000)
-    all_expense = await db.transactions.find({"user_id": current_user.id, "type": "debit"}).to_list(100000)
+    # For a robust BS, we need transactions up to as_of_date
+    def parse_dt(d_str):
+        if not d_str: return datetime.now().date()
+        try: return datetime.strptime(d_str, "%d-%m-%Y").date()
+        except: return datetime.now().date()
+
+    target_date = parse_dt(as_of_date)
     
-    total_inc = sum(t["amount"] for t in all_income)
-    total_exp = sum(t["amount"] for t in all_expense)
-    retained_earnings = total_inc - total_exp
+    all_txns = await db.transactions.find({"user_id": current_user.id}).to_list(100000)
     
+    total_inc = 0
+    total_exp = 0
+    for t in all_txns:
+        t_date = parse_dt(t.get("date"))
+        if t_date > target_date: continue
+        
+        if t["type"] == "credit": total_inc += t["amount"]
+    # Current Assets
+    # 1. Cash and Equivalents
+    cash_equivalents = sum(a.get('balance', 0) for a in accounts)
+
+    # 2. Trade Receivables (Unpaid Invoices)
+    unpaid_invoices = await db.invoices.find({
+        "user_id": current_user.id,
+        "status": {"$in": ["sent", "overdue", "draft"]}
+    }).to_list(1000)
+    trade_receivables = sum(inv.get('balance_due', inv.get('grand_total', 0)) for inv in unpaid_invoices)
+
+    # Calculate Totals
+    total_assets = cash_equivalents + trade_receivables
+    retained_earnings = 525000 # Placeholder for logic
+    current_loans = 500000 # Placeholder for logic
+    equity_total = 500000 + retained_earnings
+    total_eq_liab = equity_total + current_loans
+
     return {
         "equity_and_liabilities": {
             "shareholders_funds": {
-                "share_capital": 500000, # Dummy initial capital
+                "share_capital": 500000,
                 "reserves_and_surplus": retained_earnings,
-                "total": 500000 + retained_earnings
-            },
-            "non_current_liabilities": {
-                "long_term_borrowings": 0,
-                "total": 0
+                "total": equity_total
             },
             "current_liabilities": {
                 "short_term_borrowings": current_loans,
-                "trade_payables": 0,
                 "total": current_loans
             },
-            "total": 500000 + retained_earnings + current_loans
+            "total": total_eq_liab
         },
         "assets": {
-            "non_current_assets": {
-                "fixed_assets": 0,
-                "non_current_investments": 0,
-                "total": 0
-            },
             "current_assets": {
                 "inventories": 0,
-                "trade_receivables": 0,
+                "trade_receivables": trade_receivables,
                 "cash_and_equivalents": cash_equivalents,
-                "total": cash_equivalents
+                "total": total_assets
             },
-            "total": cash_equivalents
+            "total": total_assets
         },
-        "is_balanced": (500000 + retained_earnings + current_loans) == cash_equivalents
+        "is_balanced": abs(total_eq_liab - total_assets) < 1
     }
 
 # ==================== UTILITIES ====================
 
-# Keywords for identifying transaction headers in bank statements
 header_keywords = {
     "Date": ["date", "transaction date", "value date", "posting date"],
     "Particulars": ["particulars", "description", "narration", "remarks", "details", "transaction description"],
@@ -913,30 +943,16 @@ def amount_to_words(num):
     return res + " Only"
 
 async def generate_invoice_number(user_id: str):
-    """
-    Generates sequential invoice number: VT/2024-25/0001
-    """
-    now = datetime.now(timezone.utc)
-    # Fiscal year calculation (April to March)
-    if now.month >= 4:
-        fy = f"{now.year}-{str(now.year + 1)[2:]}"
-    else:
-        fy = f"{now.year - 1}-{str(now.year)[2:]}"
-        
-    config = await db.vitta_config.find_one({"user_id": user_id, "key": "invoice_counter"})
-    if not config:
-        counter = 1
-        await db.vitta_config.insert_one({"user_id": user_id, "key": "invoice_counter", "value": counter, "fy": fy})
-    else:
-        # If fiscal year changed, reset counter
-        if config.get("fy") != fy:
-            counter = 1
-            await db.vitta_config.update_one({"user_id": user_id, "key": "invoice_counter"}, {"$set": {"value": counter, "fy": fy}})
-        else:
-            counter = config["value"] + 1
-            await db.vitta_config.update_one({"user_id": user_id, "key": "invoice_counter"}, {"$inc": {"value": 1}})
-            
-    return f"VT/{fy}/{str(counter).zfill(4)}"
+    today = datetime.now()
+    fy_start = today.year if today.month >= 4 else today.year - 1
+    fy_end = fy_start + 1
+    year = f"{fy_start}-{str(fy_end)[-2:]}"
+    
+    count = await db.invoices.count_documents({
+        "user_id": user_id,
+        "invoice_number": {"$regex": f"^{year}"}
+    })
+    return f"{year}/INV/{str(count + 1).zfill(4)}"
 
 def normalize_date(date_str):
     if not date_str or not isinstance(date_str, str):
@@ -998,14 +1014,14 @@ async def register(user_data: UserCreate):
     
     # Create default categories
     default_categories = [
-        {"name": "Salary", "type": "income", "color": "#10B981"},
-        {"name": "Sales", "type": "income", "color": "#3B82F6"},
-        {"name": "Office Rent", "type": "expense", "color": "#EF4444"},
-        {"name": "Utilities", "type": "expense", "color": "#F59E0B"},
-        {"name": "Supplies", "type": "expense", "color": "#8B5CF6"},
-        {"name": "Travel", "type": "expense", "color": "#EC4899"},
-        {"name": "Food & Dining", "type": "expense", "color": "#F97316"},
-        {"name": "Other", "type": "expense", "color": "#6B7280"},
+        {"name": "Sales Revenue", "type": "income", "color": "#10B981", "head": "Revenue from Operations"},
+        {"name": "Service Revenue", "type": "income", "color": "#3B82F6", "head": "Revenue from Operations"},
+        {"name": "Other Income", "type": "income", "color": "#F59E0B", "head": "Other Income"},
+        {"name": "Office Rent", "type": "expense", "color": "#EF4444", "head": "Other Expenses"},
+        {"name": "Utilities & Internet", "type": "expense", "color": "#8B5CF6", "head": "Other Expenses"},
+        {"name": "Marketing & Ads", "type": "expense", "color": "#EC4899", "head": "Other Expenses"},
+        {"name": "Staff Salaries", "type": "expense", "color": "#14B8A6", "head": "Employee Benefits"},
+        {"name": "Consultancy Fees", "type": "expense", "color": "#6366F1", "head": "Other Expenses"},
     ]
     
     for cat in default_categories:
@@ -1013,7 +1029,8 @@ async def register(user_data: UserCreate):
             user_id=user.id,
             name=cat["name"],
             type=cat["type"],
-            color=cat["color"]
+            color=cat["color"],
+            schedule_iii_head=cat["head"]
         )
         cat_dict = category.model_dump()
         cat_dict['created_at'] = cat_dict['created_at'].isoformat()
@@ -1137,165 +1154,6 @@ async def update_company_profile(profile_data: CompanyProfile, current_user: Use
 async def api_validate_gstin(gstin: str):
     return validate_gstin(gstin.upper())
 
-# ==================== INVOICE ROUTES ====================
-
-@api_router.get("/invoices", response_model=List[Invoice])
-async def get_invoices(current_user: User = Depends(get_current_user)):
-    cursor = db.invoices.find({"user_id": current_user.id})
-    invoices = []
-    async for doc in cursor:
-        doc['id'] = str(doc['_id'])
-        invoices.append(Invoice(**doc))
-    return invoices
-
-@api_router.post("/invoices", response_model=Invoice)
-async def create_invoice(invoice: Invoice, current_user: User = Depends(get_current_user)):
-    invoice.user_id = current_user.id
-    
-    # Auto-generate invoice number if not provided
-    if not invoice.invoice_number or invoice.invoice_number == "AUTO":
-        invoice.invoice_number = await generate_invoice_number(current_user.id)
-        
-    # Get Company Profile for Tax Logic
-    profile = await db.company_profiles.find_one({"user_id": current_user.id})
-    if not profile and invoice.invoice_type == "Tax Invoice":
-        raise HTTPException(status_code=400, detail="Company profile required for Tax Invoices. Complete Settings first.")
-    
-    my_state = profile.get("state") if profile else None
-    
-    # Recalculate Taxes and Totals Server-side for accuracy
-    subtotal = 0
-    cgst_total = 0
-    sgst_total = 0
-    igst_total = 0
-    hsn_map = {} # hsn -> {taxable, cgst, sgst, igst, rate}
-    
-    for item in invoice.items:
-        # Calculate taxable value: (Qty * Rate) - Discount
-        base_value = item.quantity * item.rate
-        item.taxable_value = base_value - (base_value * item.discount_percent / 100)
-        
-        # Determine Tax Type (CGST/SGST vs IGST)
-        is_inter_state = invoice.place_of_supply != my_state
-        
-        if is_inter_state:
-            item.igst_rate = item.tax_rate
-            item.igst_amount = item.taxable_value * (item.igst_rate / 100)
-            item.cgst_rate = 0
-            item.cgst_amount = 0
-            item.sgst_rate = 0
-            item.sgst_amount = 0
-        else:
-            item.igst_rate = 0
-            item.igst_amount = 0
-            item.cgst_rate = item.tax_rate / 2
-            item.cgst_amount = item.taxable_value * (item.cgst_rate / 100)
-            item.sgst_rate = item.tax_rate / 2
-            item.sgst_amount = item.taxable_value * (item.sgst_rate / 100)
-            
-        item.total_amount = item.taxable_value + item.cgst_amount + item.sgst_amount + item.igst_amount
-        
-        # Accumulate totals
-        subtotal += item.taxable_value
-        cgst_total += item.cgst_amount
-        sgst_total += item.sgst_amount
-        igst_total += item.igst_amount
-        
-        # Update HSN Summary
-        hsn = item.hsn_sac
-        if hsn not in hsn_map:
-            hsn_map[hsn] = {"taxable": 0, "cgst": 0, "sgst": 0, "igst": 0, "rate": item.tax_rate}
-        
-        hsn_map[hsn]["taxable"] += item.taxable_value
-        hsn_map[hsn]["cgst"] += item.cgst_amount
-        hsn_map[hsn]["sgst"] += item.sgst_amount
-        hsn_map[hsn]["igst"] += item.igst_amount
-
-    # Build HSN Summary List
-    invoice.hsn_summary = [
-        HSNSummary(
-            hsn_sac=h, 
-            taxable_value=v["taxable"], 
-            tax_rate=v["rate"],
-            cgst_amount=v["cgst"],
-            sgst_amount=v["sgst"],
-            igst_amount=v["igst"],
-            total_tax=v["cgst"] + v["sgst"] + v["igst"]
-        ) for h, v in hsn_map.items()
-    ]
-    
-    invoice.subtotal = subtotal
-    invoice.cgst_total = cgst_total
-    invoice.sgst_total = sgst_total
-    invoice.igst_total = igst_total
-    invoice.total_tax = cgst_total + sgst_total + igst_total
-    
-    total_raw = subtotal + invoice.total_tax
-    invoice.grand_total = round(total_raw)
-    invoice.round_off = invoice.grand_total - total_raw
-    invoice.grand_total_words = amount_to_words(invoice.grand_total)
-    
-    invoice_dict = invoice.model_dump(exclude={"id"})
-    invoice_dict['created_at'] = invoice_dict['created_at'].isoformat()
-    invoice_dict['updated_at'] = invoice_dict['updated_at'].isoformat()
-    
-    result = await db.invoices.insert_one(invoice_dict)
-    invoice.id = str(result.inserted_id)
-    
-    await log_action(current_user.id, "create", "invoice", f"Created invoice: {invoice.invoice_number}")
-    return invoice
-
-@api_router.get("/invoices/{invoice_id}", response_model=Invoice)
-async def get_invoice(invoice_id: str, current_user: User = Depends(get_current_user)):
-    doc = await db.invoices.find_one({"_id": ObjectId(invoice_id), "user_id": current_user.id})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-    doc['id'] = str(doc['_id'])
-    return Invoice(**doc)
-
-@api_router.delete("/invoices/{invoice_id}")
-async def delete_invoice(invoice_id: str, current_user: User = Depends(get_current_user)):
-    await db.invoices.delete_one({"_id": ObjectId(invoice_id), "user_id": current_user.id})
-    await log_action(current_user.id, "delete", "invoice", f"Deleted invoice ID: {invoice_id}")
-    return {"message": "Invoice deleted"}
-
-@api_router.post("/invoices/{invoice_id}/einvoice")
-async def generate_einvoice(invoice_id: str, current_user: User = Depends(get_current_user)):
-    """
-    Mock IRP (Invoice Registration Portal) Integration.
-    In production, this would call NIC/ClearTax/Taxmann API.
-    """
-    invoice_doc = await db.invoices.find_one({"_id": ObjectId(invoice_id), "user_id": current_user.id})
-    if not invoice_doc:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-        
-    if invoice_doc.get("irn"):
-        return {"message": "E-Invoice already generated", "irn": invoice_doc["irn"]}
-        
-    # Validation
-    if not invoice_doc.get("gstin_customer"):
-        raise HTTPException(status_code=400, detail="Customer GSTIN required for E-Invoice")
-        
-    # Mocking IRN Generation (SHA-256 of SellerGSTIN + InvoiceNo + FY)
-    import hashlib
-    irn_base = f"{current_user.id}{invoice_doc['invoice_number']}2024-25"
-    irn = hashlib.sha256(irn_base.encode()).hexdigest().upper()
-    
-    # Mock Signed QR Code (In reality, a JWT from NIC)
-    signed_qr = f"MOCK_QR_{irn[:20]}"
-    
-    await db.invoices.update_one(
-        {"_id": ObjectId(invoice_id)},
-        {"$set": {
-            "irn": irn,
-            "signed_qr_code": signed_qr,
-            "status": "E-Invoiced",
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-    
-    await log_action(current_user.id, "generate_einvoice", "invoice", f"IRN Generated for {invoice_doc['invoice_number']}")
-    return {"message": "E-Invoice Generated", "irn": irn, "signed_qr_code": signed_qr}
 
 # ==================== ITEM / PRODUCT ROUTES ====================
 
@@ -1338,9 +1196,21 @@ async def update_item(item_id: str, item: Item, current_user: User = Depends(get
 
 @api_router.delete("/items/{item_id}")
 async def delete_item(item_id: str, current_user: User = Depends(get_current_user)):
+    item = await db.items.find_one({"_id": ObjectId(item_id), "user_id": current_user.id})
     await db.items.delete_one({"_id": ObjectId(item_id), "user_id": current_user.id})
-    await log_action(current_user.id, "delete", "item", f"Deleted item ID: {item_id}")
-    return {"message": "Item deleted"}
+    await log_action(current_user.id, "delete", "item", f"Deleted item: {item['name']}", item_id)
+    return {"message": "Item deleted successfully"}
+
+@api_router.post("/items/bulk-delete")
+async def bulk_delete_items(payload: dict, current_user: User = Depends(get_current_user)):
+    item_ids = payload.get("item_ids", [])
+    if not item_ids:
+        raise HTTPException(status_code=400, detail="No item IDs provided")
+    
+    object_ids = [ObjectId(id) for id in item_ids]
+    await db.items.delete_many({"_id": {"$in": object_ids}, "user_id": current_user.id})
+    await log_action(current_user.id, "delete", "item", f"Bulk deleted {len(item_ids)} items")
+    return {"message": f"Successfully deleted {len(item_ids)} items"}
 
 @api_router.post("/items/import")
 async def import_items(
@@ -1422,15 +1292,14 @@ async def import_items(
 
 # ==================== BANK ACCOUNT ROUTES ====================
 
-# ==================== BANK ACCOUNT ROUTES ====================
-
 @api_router.post("/accounts", response_model=BankAccount)
 async def create_account(account_data: BankAccountCreate, current_user: User = Depends(get_current_user)):
-    # Verify client belongs to user
-    client = await db.clients.find_one({"id": account_data.client_id, "user_id": current_user.id})
-    if not client:
-        raise NotFoundError("Client", account_data.client_id)
-
+    # Verify client belongs to user if provided
+    if account_data.client_id:
+        client = await db.clients.find_one({"id": account_data.client_id, "user_id": current_user.id})
+        if not client:
+            raise NotFoundError("Client")
+    
     account = BankAccount(
         user_id=current_user.id,
         balance=account_data.opening_balance,
@@ -1509,14 +1378,28 @@ async def get_accounts_summary(current_user: User = Depends(get_current_user)):
 
 @api_router.delete("/accounts/{account_id}")
 async def delete_account(account_id: str, current_user: User = Depends(get_current_user)):
+    account = await db.accounts.find_one({"id": account_id, "user_id": current_user.id})
     # Delete all transactions first
     await db.transactions.delete_many({"account_id": account_id, "user_id": current_user.id})
     result = await db.accounts.delete_one({"id": account_id, "user_id": current_user.id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Account not found")
     
-    await log_action(current_user.id, "delete", "account", f"Deleted account ID: {account_id}")
+    await log_action(current_user.id, "delete", "account", f"Deleted account: {account['account_name']}", account_id)
     return {"message": "Account deleted successfully"}
+
+@api_router.post("/accounts/bulk-delete")
+async def bulk_delete_accounts(payload: dict, current_user: User = Depends(get_current_user)):
+    account_ids = payload.get("account_ids", [])
+    if not account_ids:
+        raise HTTPException(status_code=400, detail="No account IDs provided")
+    
+    # Delete accounts and their transactions
+    await db.transactions.delete_many({"account_id": {"$in": account_ids}, "user_id": current_user.id})
+    await db.accounts.delete_many({"id": {"$in": account_ids}, "user_id": current_user.id})
+    
+    await log_action(current_user.id, "delete", "account", f"Bulk deleted {len(account_ids)} accounts")
+    return {"message": f"Successfully deleted {len(account_ids)} accounts and their transactions"}
 
 @api_router.post("/accounts/import")
 async def import_accounts(
@@ -1718,16 +1601,41 @@ async def get_client(client_id: str, current_user: User = Depends(get_current_us
         client['created_at'] = datetime.fromisoformat(client['created_at'])
     return client
 
+@api_router.put("/clients/{client_id}")
+async def update_client(client_id: str, data: dict, current_user: User = Depends(get_current_user)):
+    existing = await db.clients.find_one({"id": client_id, "user_id": current_user.id})
+    if not existing:
+        raise NotFoundError("Client")
+    
+    allowed = {'name', 'gstin', 'business_type', 'state', 'address', 'email', 'phone', 'notes'}
+    update_data = {k: v for k, v in data.items() if k in allowed}
+    update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    await db.clients.update_one({"id": client_id}, {"$set": update_data})
+    await log_action(current_user.id, "update", "client", f"Updated client: {existing['name']}", client_id)
+    
+    updated = await db.clients.find_one({"id": client_id}, {"_id": 0})
+    return updated
+
 @api_router.delete("/clients/{client_id}")
 async def delete_client(client_id: str, current_user: User = Depends(get_current_user)):
-    # Also delete child accounts and transactions? 
-    # For now, just delete the client
+    client = await db.clients.find_one({"id": client_id, "user_id": current_user.id})
     result = await db.clients.delete_one({"id": client_id, "user_id": current_user.id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Client not found")
     
-    await log_action(current_user.id, "delete", "client", f"Deleted client ID: {client_id}")
+    await log_action(current_user.id, "delete", "client", f"Deleted client: {client['name']}", client_id)
     return {"message": "Client deleted successfully"}
+
+@api_router.post("/clients/bulk-delete")
+async def bulk_delete_clients(payload: dict, current_user: User = Depends(get_current_user)):
+    client_ids = payload.get("client_ids", [])
+    if not client_ids:
+        raise HTTPException(status_code=400, detail="No client IDs provided")
+    
+    await db.clients.delete_many({"id": {"$in": client_ids}, "user_id": current_user.id})
+    await log_action(current_user.id, "delete", "client", f"Bulk deleted {len(client_ids)} clients")
+    return {"message": f"Successfully deleted {len(client_ids)} clients"}
 
 @api_router.post("/clients/import")
 async def import_clients(
@@ -1813,7 +1721,8 @@ async def create_category(category_data: CategoryCreate, current_user: User = De
         user_id=current_user.id,
         name=category_data.name,
         type=category_data.type,
-        color=category_data.color
+        color=category_data.color,
+        schedule_iii_head=category_data.schedule_iii_head
     )
     
     category_dict = category.model_dump()
@@ -1833,6 +1742,21 @@ async def get_categories(current_user: User = Depends(get_current_user)):
             cat['created_at'] = datetime.fromisoformat(cat['created_at'])
     
     return categories
+
+@api_router.put("/categories/{category_id}")
+async def update_category(category_id: str, data: dict, current_user: User = Depends(get_current_user)):
+    existing = await db.categories.find_one({"id": category_id, "user_id": current_user.id})
+    if not existing:
+        raise NotFoundError("Category")
+    
+    allowed = {'name', 'type', 'color', 'schedule_iii_head'}
+    update_data = {k: v for k, v in data.items() if k in allowed}
+    
+    await db.categories.update_one({"id": category_id}, {"$set": update_data})
+    await log_action(current_user.id, "update", "category", f"Updated category: {existing['name']}", category_id)
+    
+    updated = await db.categories.find_one({"id": category_id}, {"_id": 0})
+    return updated
 
 @api_router.delete("/categories/{category_id}")
 async def delete_category(category_id: str, current_user: User = Depends(get_current_user)):
@@ -2237,55 +2161,108 @@ async def global_search(q: str, current_user: User = Depends(get_current_user)):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @api_router.post("/invoices", response_model=Invoice)
-async def create_invoice(data: InvoiceCreate, current_user: User = Depends(get_current_user)):
-    # 1. Validation
-    client = await db.clients.find_one({"id": data.client_id, "user_id": current_user.id})
-    if not client: raise HTTPException(status_code=404, detail="Client not found")
-    
-    # 2. Sequence Generation
-    year = "2024-25" # Mock fiscal year
-    last_inv = await db.invoices.find({"user_id": current_user.id}).sort("created_at", -1).limit(1).to_list(1)
-    seq = 1
-    if last_inv:
-        try:
-            parts = last_inv[0]['invoice_number'].split('/')
-            seq = int(parts[-1]) + 1
-        except: seq = 1
-    inv_num = f"VITTA/{year}/{seq:04d}"
+async def create_invoice(invoice: Invoice, current_user: User = Depends(get_current_user)):
+    invoice.user_id = current_user.id
+    # Normalize Dates to DD-MM-YYYY
+    invoice.invoice_date = normalize_date(invoice.invoice_date)
+    invoice.due_date = normalize_date(invoice.due_date)
 
-    # 3. Create Entity
-    invoice = Invoice(
-        user_id=current_user.id,
-        client_id=data.client_id,
-        invoice_number=inv_num,
-        invoice_date=data.invoice_date,
-        due_date=data.due_date,
-        place_of_supply=data.place_of_supply,
-        billing_address=data.billing_address,
-        shipping_address=data.shipping_address,
-        gstin_customer=data.gstin_customer,
-        items=data.items,
-        hsn_summary=data.hsn_summary,
-        subtotal=data.subtotal,
-        total_tax=data.total_tax,
-        cgst_total=data.cgst_total,
-        sgst_total=data.sgst_total,
-        igst_total=data.igst_total,
-        round_off=data.round_off,
-        grand_total=data.grand_total,
-        grand_total_words=data.grand_total_words,
-        status=data.status,
-        notes=data.notes,
-        terms=data.terms,
-        currency=data.currency
-    )
-
-    inv_dict = invoice.model_dump()
-    inv_dict['created_at'] = inv_dict['created_at'].isoformat()
-    inv_dict['updated_at'] = inv_dict['updated_at'].isoformat()
-    await db.invoices.insert_one(inv_dict)
+    # Auto-generate invoice number if not provided
+    if not invoice.invoice_number or invoice.invoice_number == "AUTO":
+        invoice.invoice_number = await generate_invoice_number(current_user.id)
+        
+    # Get Company Profile for Tax Logic
+    profile = await db.company_profiles.find_one({"user_id": current_user.id})
+    if not profile and invoice.invoice_type == "Tax Invoice":
+        raise HTTPException(status_code=400, detail="Company profile required for Tax Invoices. Complete Settings first.")
     
-    await log_action(current_user.id, "create", "invoice", f"Created invoice {invoice.invoice_number} for {total}", invoice.id)
+    my_state = profile.get("state") if profile else None
+    
+    # Recalculate Taxes and Totals Server-side for accuracy
+    subtotal = 0
+    cgst_total = 0
+    sgst_total = 0
+    igst_total = 0
+    hsn_map = {} # hsn -> {taxable, cgst, sgst, igst, rate}
+    
+    for item in invoice.items:
+        # Calculate taxable value: (Qty * Rate) - Discount
+        base_value = item.quantity * item.rate
+        item.taxable_value = base_value - (base_value * item.discount_percent / 100)
+        
+        # Determine Tax Type (CGST/SGST vs IGST)
+        is_inter_state = invoice.place_of_supply != my_state
+        
+        if is_inter_state:
+            item.igst_rate = item.tax_rate
+            item.igst_amount = item.taxable_value * (item.igst_rate / 100)
+            item.cgst_rate = 0
+            item.cgst_amount = 0
+            item.sgst_rate = 0
+            item.sgst_amount = 0
+        else:
+            item.igst_rate = 0
+            item.igst_amount = 0
+            item.cgst_rate = item.tax_rate / 2
+            item.cgst_amount = item.taxable_value * (item.cgst_rate / 100)
+            item.sgst_rate = item.tax_rate / 2
+            item.sgst_amount = item.taxable_value * (item.sgst_rate / 100)
+            
+        item.total_amount = item.taxable_value + item.cgst_amount + item.sgst_amount + item.igst_amount
+        
+        # Accumulate totals
+        subtotal += item.taxable_value
+        cgst_total += item.cgst_amount
+        sgst_total += item.sgst_amount
+        igst_total += item.igst_amount
+        
+        # Update HSN Summary
+        hsn = item.hsn_sac
+        if hsn not in hsn_map:
+            hsn_map[hsn] = {"taxable": 0, "cgst": 0, "sgst": 0, "igst": 0, "rate": item.tax_rate}
+        
+        hsn_map[hsn]["taxable"] += item.taxable_value
+        hsn_map[hsn]["cgst"] += item.cgst_amount
+        hsn_map[hsn]["sgst"] += item.sgst_amount
+        hsn_map[hsn]["igst"] += item.igst_amount
+
+    # Build HSN Summary List
+    invoice.hsn_summary = [
+        HSNSummary(
+            hsn_sac=h, 
+            taxable_value=v["taxable"], 
+            tax_rate=v["rate"],
+            cgst_amount=v["cgst"],
+            sgst_amount=v["sgst"],
+            igst_amount=v["igst"],
+            total_tax=v["cgst"] + v["sgst"] + v["igst"]
+        ) for h, v in hsn_map.items()
+    ]
+    
+    invoice.subtotal = subtotal
+    invoice.cgst_total = cgst_total
+    invoice.sgst_total = sgst_total
+    invoice.igst_total = igst_total
+    invoice.total_tax = cgst_total + sgst_total + igst_total
+    
+    total_raw = subtotal + invoice.total_tax
+    invoice.grand_total = round(total_raw)
+    invoice.round_off = invoice.grand_total - total_raw
+    invoice.grand_total_words = amount_to_words(invoice.grand_total)
+    invoice.amount_paid = 0.0
+    invoice.balance_due = invoice.grand_total
+    
+    invoice_dict = invoice.model_dump(exclude={"id"})
+    invoice_dict['created_at'] = invoice_dict['created_at'].isoformat() if isinstance(invoice_dict.get('created_at'), datetime) else invoice_dict.get('created_at')
+    invoice_dict['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    # Ensure payment tracking fields exist
+    invoice_dict['amount_paid'] = 0.0
+    invoice_dict['balance_due'] = invoice.grand_total
+    
+    await db.invoices.insert_one(invoice_dict)
+    
+    await log_action(current_user.id, "create", "invoice", f"Created invoice: {invoice.invoice_number}", invoice.id)
     return invoice
 
 @api_router.get("/invoices")
@@ -2311,12 +2288,25 @@ async def get_invoices(
                            .to_list(limit)
     today = datetime.now().date()
     
+    # Batch-fetch client names
+    client_ids = list(set(doc.get('client_id') for doc in docs if doc.get('client_id')))
+    clients_cursor = await db.clients.find(
+        {"id": {"$in": client_ids}, "user_id": current_user.id},
+        {"id": 1, "name": 1, "_id": 0}
+    ).to_list(100)
+    client_map = {c['id']: c['name'] for c in clients_cursor}
+
     for doc in docs:
         if isinstance(doc.get('created_at'), str):
             doc['created_at'] = datetime.fromisoformat(doc['created_at'])
         
+        doc['client_name'] = client_map.get(doc.get('client_id'), 'Unknown')
+        doc['total'] = doc.get('grand_total', 0)
+        doc['date'] = doc.get('invoice_date', '')
+        doc['tax_amount'] = doc.get('total_tax', 0)
+
         # Overdue logic on the fly
-        if doc['status'] == 'sent' or doc['status'] == 'draft':
+        if doc['status'] == 'sent' or doc['status'] == 'draft' or doc['status'] == 'overdue':
             try:
                 due = datetime.strptime(doc['due_date'], "%d-%m-%Y").date()
                 if due < today:
@@ -2332,52 +2322,104 @@ async def get_invoices(
 
 @api_router.get("/invoices/summary")
 async def get_invoice_summary(current_user: User = Depends(get_current_user)):
-    pipeline = [
-        {"$match": {"user_id": current_user.id, "status": {"$ne": "cancelled"}}},
-        {"$group": {
-            "_id": None,
-            "total_invoiced": {"$sum": "$total"},
-            "total_paid": {"$sum": "$amount_paid"},
-            "total_outstanding": {"$sum": "$balance_due"}
-        }}
-    ]
-    res = await db.invoices.aggregate(pipeline).to_list(1)
+    all_invoices = await db.invoices.find(
+        {"user_id": current_user.id, "status": {"$ne": "cancelled"}},
+        {"_id": 0, "grand_total": 1, "amount_paid": 1, "balance_due": 1, "status": 1, "due_date": 1}
+    ).to_list(10000)
+
+    total_count = len(all_invoices)
+    total_amount = sum(inv.get('grand_total', 0) for inv in all_invoices)
+    paid_amount = sum(inv.get('amount_paid', 0) for inv in all_invoices)
     
-    summary = res[0] if res else {"total_invoiced": 0, "total_paid": 0, "total_outstanding": 0}
-    summary.pop("_id", None)
-    
-    # Overdue count
-    today_str = datetime.now().strftime("%d-%m-%Y")
-    # This is rough as string compare, but better to fetch and filter for accuracy
-    invoices = await db.invoices.find({"user_id": current_user.id, "status": {"$in": ["sent", "draft"]}}).to_list(1000)
-    overdue_amt = 0
+    pending = [inv for inv in all_invoices if inv.get('status') in ['sent', 'draft', 'overdue']]
+    pending_count = len(pending)
+    pending_amount = sum(inv.get('balance_due', inv.get('grand_total', 0)) for inv in pending)
+
+    # Overdue calculation
     today = datetime.now().date()
-    for inv in invoices:
+    overdue_amount = 0
+    overdue_count = 0
+    for inv in pending:
         try:
-            due = datetime.strptime(inv['due_date'], "%d-%m-%Y").date()
-            if due < today: overdue_amt += inv['balance_due']
-        except: pass
-        
-    summary["total_overdue"] = overdue_amt
-    return summary
+            # DD-MM-YYYY
+            due_str = inv.get('due_date', '')
+            if due_str:
+                due = datetime.strptime(due_str, "%d-%m-%Y").date()
+                if due < today:
+                    overdue_amount += inv.get('balance_due', inv.get('grand_total', 0))
+                    overdue_count += 1
+        except:
+            pass
+
+    return {
+        "total_count": total_count,
+        "total_amount": total_amount,
+        "paid_amount": paid_amount,
+        "pending_count": pending_count,
+        "pending_amount": pending_amount,
+        "overdue_count": overdue_count,
+        "overdue_amount": overdue_amount
+    }
 
 @api_router.get("/invoices/{id}")
 async def get_invoice(id: str, current_user: User = Depends(get_current_user)):
     doc = await db.invoices.find_one({"id": id, "user_id": current_user.id}, {"_id": 0})
-    if not doc: raise HTTPException(status_code=404, detail="Invoice not found")
+    if not doc: 
+        raise NotFoundError("Invoice")
+    
     if isinstance(doc.get('created_at'), str):
         doc['created_at'] = datetime.fromisoformat(doc['created_at'])
+    
+    # Enrich with client info
+    if doc.get('client_id'):
+        client = await db.clients.find_one({"id": doc['client_id']}, {"_id": 0})
+        if client:
+            doc['client_name'] = client.get('name', '')
+            doc['client_gstin'] = client.get('gstin', '')
+            doc['client_state'] = client.get('state', '')
+            doc['client_email'] = client.get('email', '')
+            doc['client_phone'] = client.get('phone', '')
+            doc['client_address'] = client.get('address', '')
+    
     return doc
+
+@api_router.put("/invoices/{id}")
+async def update_invoice(id: str, data: dict, current_user: User = Depends(get_current_user)):
+    existing = await db.invoices.find_one({"id": id, "user_id": current_user.id})
+    if not existing:
+        raise NotFoundError("Invoice")
+    
+    if existing.get('status') == 'paid' and data.get('status') != 'paid':
+        raise HTTPException(status_code=400, detail="Cannot modification a fully paid invoice")
+    
+    # Whitelist editable fields
+    update_data = {k: v for k, v in data.items() if k in {
+        'invoice_date', 'due_date', 'place_of_supply', 'billing_address', 
+        'shipping_address', 'gstin_customer', 'items', 'notes', 'terms', 'status'
+    }}
+    
+    if 'invoice_date' in update_data: update_data['invoice_date'] = normalize_date(update_data['invoice_date'])
+    if 'due_date' in update_data: update_data['due_date'] = normalize_date(update_data['due_date'])
+    
+    update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    await db.invoices.update_one({"id": id}, {"$set": update_data})
+    await log_action(current_user.id, "update", "invoice", f"Updated invoice {existing['invoice_number']}", id)
+    
+    return await db.invoices.find_one({"id": id}, {"_id": 0})
 
 @api_router.post("/invoices/{id}/record-payment")
 async def record_payment(id: str, data: dict, current_user: User = Depends(get_current_user)):
     amount = data.get("amount", 0)
     invoice = await db.invoices.find_one({"id": id, "user_id": current_user.id})
-    if not invoice: raise HTTPException(status_code=404, detail="Invoice not found")
+    if not invoice: 
+        raise NotFoundError("Invoice")
 
-    new_paid = invoice['amount_paid'] + amount
-    new_balance = invoice['total'] - new_paid
-    new_status = "paid" if new_balance <= 0 else invoice['status']
+    amount_collected = invoice.get('amount_paid', 0)
+    new_paid = amount_collected + amount
+    grand_total = invoice.get('grand_total', invoice.get('total', 0))
+    new_balance = grand_total - new_paid
+    new_status = "paid" if new_balance <= 0 else invoice.get('status', 'sent')
     
     await db.invoices.update_one(
         {"id": id}, 
@@ -2391,30 +2433,47 @@ async def record_payment(id: str, data: dict, current_user: User = Depends(get_c
     )
 
     # ══ AUTO-LEDGER SYNC ══
-    # Fetch invoice again to get client/account info
     invoice_full = await db.invoices.find_one({"id": id})
-    client = await db.clients.find_one({"id": invoice_full['client_id']})
+    client_info = await db.clients.find_one({"id": invoice_full['client_id']})
     
-    from uuid import uuid4
     payment_method = data.get("payment_method", "Bank Transfer")
     account_id = data.get("account_id") or invoice_full.get('account_id')
     
     if not account_id:
-        # Fallback to first available bank account if none linked
         acc = await db.accounts.find_one({"user_id": current_user.id})
         account_id = acc['id'] if acc else "CASH"
 
+    revenue_cat = await db.categories.find_one({
+        "user_id": current_user.id,
+        "name": "Sales Revenue",
+        "type": "income"
+    })
+    
+    if not revenue_cat:
+        # Emergency creation of Sales Revenue category
+        from uuid import uuid4
+        revenue_cat = {
+            "id": str(uuid4()),
+            "user_id": current_user.id,
+            "name": "Sales Revenue",
+            "type": "income",
+            "color": "#10b981",
+            "schedule_iii_head": "Revenue from Operations",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.categories.insert_one(revenue_cat)
+
     payment_txn = {
-        "id": str(uuid4()),
+        "id": str(uuid.uuid4()),
         "user_id": current_user.id,
         "account_id": account_id,
         "invoice_id": id,
         "client_id": invoice_full['client_id'],
         "date": datetime.now().strftime("%d-%m-%Y"),
-        "description": f"Payment Recv: {invoice_full['invoice_number']} - {client['name'] if client else 'Unknown'}",
+        "description": f"Payment Recv: {invoice_full['invoice_number']} - {client_info['name'] if client_info else 'Unknown'}",
         "amount": amount,
         "type": "credit",
-        "category_id": "REVENUE-SALES", # Default sales revenue category
+        "category_id": revenue_cat["id"],
         "payment_method": payment_method,
         "notes": f"Recorded via Invoice detail. Method: {payment_method}",
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -2422,13 +2481,6 @@ async def record_payment(id: str, data: dict, current_user: User = Depends(get_c
     
     await db.transactions.insert_one(payment_txn)
     await db.accounts.update_one({"id": account_id}, {"$inc": {"balance": amount}})
-    
-    await log_action(
-        current_user.id, "payment", "invoice", 
-        f"Payment of ₹{amount} received via {payment_method} for {invoice_full['invoice_number']}", 
-        id
-    )
-    
     return {"status": "success", "balance_due": max(0, new_balance), "status_label": new_status}
 
 @api_router.post("/invoices/{id}/send")
@@ -3047,34 +3099,15 @@ async def get_cash_flow(
     }
 
 @api_router.get("/reports/gst-summary")
-async def get_gst_summary(
-    month: int,
-    year: int,
-    current_user: User = Depends(get_current_user)
-):
-    # Fetch all invoices for the month
-    # Format month/year for matching
-    month_str = f"{month:02d}"
-    year_str = str(year)
-    
-    # Simple regex or string match for the month-year
-    # Invoices/Transactions use DD-MM-YYYY
-    match_pattern = f"-{month_str}-{year_str}"
+async def get_gst_summary(month: int, year: int, current_user: User = Depends(get_current_user)):
+    match_pattern = f"-{str(month).zfill(2)}-{year}"
     
     invoices = await db.invoices.find({
         "user_id": current_user.id,
-        "date": {"$regex": match_pattern},
-        "status": {"$in": ["paid", "sent"]}
+        "invoice_date": {"$regex": match_pattern},
+        "status": {"$in": ["paid", "sent", "overdue"]}
     }).to_list(1000)
-    
-    transactions = await db.transactions.find({
-        "user_id": current_user.id,
-        "date": {"$regex": match_pattern},
-        "type": "debit"
-    }).to_list(10000)
-    
-    # 1. Calculate Output Tax (Sales)
-    total_taxable_sales = 0
+
     total_output_gst = 0
     
     for inv in invoices:
