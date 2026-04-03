@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {  LayoutDashboard,  ArrowUpRight,  ArrowDownLeft,  Wallet,  TrendingUp,  Clock,  Plus,  Search,  MoreHorizontal, User, Users, Settings, CreditCard, FileText, Building2, PieChart as PieIcon, BarChart3, Receipt, PenLine, FileSpreadsheet, PlusCircle, Menu, LogOut, Upload, Tag, UserPlus, FileUp, Zap, History
+import {  LayoutDashboard,  ArrowUpRight,  ArrowDownLeft,  Wallet,  TrendingUp,  Clock,  Plus,  Search,  MoreHorizontal, User, Users, Settings, CreditCard, FileText, Building2, PieChart as PieIcon, BarChart3, Receipt, PenLine, FileSpreadsheet, PlusCircle, Menu, LogOut, Upload, Tag, UserPlus, FileUp, Zap, History, ShoppingBag
 } from 'lucide-react';
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -33,6 +33,7 @@ const menuItemsRaw = [
   { path: '/accounts',     icon: Wallet,           label: 'Accounts',         testId: 'menu-accounts',  feature: 'accounts' },
   { path: '/transactions', icon: CreditCard,       label: 'Transactions',     testId: 'menu-transactions', feature: 'transactions' },
   { path: '/invoices',     icon: FileText,         label: 'Invoices',         testId: 'menu-invoices',     feature: 'invoices' },
+  { path: '/items',        icon: ShoppingBag,      label: 'Items & SAC',      testId: 'menu-items',        feature: 'invoices' },
   { path: '/import',       icon: PlusCircle,       label: 'Add Transactions', testId: 'menu-import',       feature: 'transactions' },
   { path: '/reports',      icon: BarChart3,        label: 'Reports',          testId: 'menu-reports',      feature: 'reports' },
   { path: '/categories',   icon: Tag,              label: 'Groups',           testId: 'menu-categories',   feature: 'settings' },

@@ -5,477 +5,461 @@ import api from '@/lib/api';
 import {
   ArrowLeft, Download, Send, CreditCard, Edit, Printer,
   CheckCircle2, Clock, AlertCircle, FileText, MoreHorizontal,
-  Mail, Share2, Copy, History, ShieldCheck, Zap, Trash2, PenLine
+  Mail, Share2, Copy, History, ShieldCheck, Zap, Trash2, PenLine,
+  Landmark, Building2, MapPin, Receipt, Package, ShoppingBag, Eye,
+  CheckCircle, Loader2
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuTrigger, DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-const FontStyle = () => (
-    <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-      [data-invoice-detail-root] { 
-        font-family: 'Inter', sans-serif;
-        background: #f8fafc;
-        min-height: 100vh;
-      }
-      .professional-paper {
-        background: white;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 10px 15px -3px rgba(0,0,0,0.03);
-      }
-      .data-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 4px 0;
-        border-bottom: 1px solid #f1f5f9;
-      }
-      .data-label {
-        font-size: 11px;
-        font-weight: 600;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.025em;
-      }
-      .data-value {
-        font-size: 12px;
-        font-weight: 700;
-        color: #1e293b;
-        font-variant-numeric: tabular-nums;
-      }
-    `}</style>
-);
 
 const InvoiceDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [invoice, setInvoice] = useState(null);
     const [client, setClient] = useState(null);
+    const [myProfile, setMyProfile] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [paymentAmount, setPaymentAmount] = useState(0);
-    const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+    const [generatingEinvoice, setGeneratingEinvoice] = useState(false);
 
     useEffect(() => {
-        const fetchInvoice = async () => {
+        const fetchData = async () => {
             setLoading(true);
             try {
-                const res = await api.get(`/invoices/${id}`);
-                setInvoice(res.data);
-                setPaymentAmount(res.data.balance_due);
-                const cRes = await api.get(`/clients/${res.data.client_id}`);
+                const [invRes, profRes] = await Promise.all([
+                    api.get(`/invoices/${id}`),
+                    api.get('/company-profile')
+                ]);
+                setInvoice(invRes.data);
+                setMyProfile(profRes.data);
+                
+                const cRes = await api.get(`/clients/${invRes.data.client_id}`);
                 setClient(cRes.data);
             } catch (e) {
-                toast.error("Failed to load invoice");
+                toast.error("Failed to load invoice details");
             } finally {
                 setLoading(false);
             }
         };
-        fetchInvoice();
+        fetchData();
     }, [id]);
-
-    const handleSend = async () => {
-        const promise = api.post(`/invoices/${id}/send`);
-        toast.promise(promise, {
-            loading: 'Processing...',
-            success: () => {
-                setInvoice({...invoice, status: 'sent'});
-                return 'Invoice sent';
-            },
-            error: 'Failed to send'
-        });
-    };
-
-    const handleRecordPayment = async () => {
-        if (paymentAmount <= 0) return toast.error("Enter a valid amount");
-        try {
-            await api.post(`/invoices/${id}/record-payment`, { amount: paymentAmount });
-            toast.success("Payment recorded");
-            setIsPaymentOpen(false);
-            const invRes = await api.get(`/invoices/${id}`);
-            setInvoice(invRes.data);
-        } catch (e) {
-            toast.error("Payment sync failed");
-        }
-    };
 
     const exportPDF = () => {
         const doc = new jsPDF();
-        
-        // ─── Document Header (Professional Branding) ───
-        doc.setFillColor(15, 23, 42); // Slate 900
-        doc.rect(0, 0, 210, 45, 'F');
+        const primaryColor = [15, 23, 42];
+        const secondaryColor = [100, 116, 139];
+
+        // --- Header Section ---
+        doc.setFillColor(...primaryColor);
+        doc.rect(0, 0, 210, 40, 'F');
         
         doc.setTextColor(255, 255, 255);
+        doc.setFontSize(24);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(28);
-        doc.text('VITTA', 20, 28);
+        doc.text(myProfile?.business_name || 'VITTA ACCOUNTING', 15, 25);
         
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        doc.text('DIGITAL COMPLIANCE INFRASTRUCTURE', 20, 36);
-        
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.text('TAX INVOICE', 190, 28, { align: 'right' });
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Reference: ${invoice.invoice_number}`, 190, 36, { align: 'right' });
-
-        // ─── Entity Information ───
-        let yPos = 60;
-        
-        // From (Your Business)
-        doc.setTextColor(100, 116, 139); // Slate 500
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'bold');
-        doc.text('BILLER / ORIGINATOR', 20, yPos);
-        
-        doc.setTextColor(30, 41, 59); // Slate 800
-        doc.setFontSize(12);
-        doc.text('Vitta Accounting Services', 20, yPos + 7);
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        doc.text('Bangalore, KA, India', 20, yPos + 13);
-        doc.text('support@vitta.io', 20, yPos + 18);
-
-        // To (Client)
-        doc.setTextColor(100, 116, 139);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'bold');
-        doc.text('BILLED TO / CUSTOMER', 110, yPos);
-        
-        doc.setTextColor(30, 41, 59);
-        doc.setFontSize(12);
-        doc.text(client?.name || 'Customer Entity', 110, yPos + 7);
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        doc.text(client?.business_type || 'Private Client', 110, yPos + 13);
-        doc.text(client?.country || 'International', 110, yPos + 18);
-
-        // ─── Status & Dates ───
-        yPos += 35;
-        doc.setFillColor(248, 250, 252); // Slate 50
-        doc.rect(20, yPos, 170, 18, 'F');
-        
-        doc.setFontSize(8);
-        doc.setTextColor(100, 116, 139);
-        doc.text('ISSUED DATE', 25, yPos + 7);
-        doc.text('DUE DATE', 75, yPos + 7);
-        doc.text('CURRENCY', 125, yPos + 7);
-        doc.text('STATUS', 175, yPos + 7, { align: 'right' });
-
         doc.setFontSize(10);
-        doc.setTextColor(15, 23, 42);
+        doc.setFont('helvetica', 'normal');
+        doc.text(invoice?.invoice_type?.toUpperCase() || 'TAX INVOICE', 195, 25, { align: 'right' });
+        
+        // --- Addresses Section ---
+        doc.setTextColor(...primaryColor);
+        let y = 50;
+        
+        // Seller (Left)
+        doc.setFontSize(8);
         doc.setFont('helvetica', 'bold');
-        doc.text(invoice.date, 25, yPos + 13);
-        doc.text(invoice.due_date, 75, yPos + 13);
-        doc.text(invoice.currency, 125, yPos + 13);
-        doc.text(invoice.status.toUpperCase(), 175, yPos + 13, { align: 'right' });
+        doc.text('SOLD BY / BILLER', 15, y);
+        doc.setFontSize(10);
+        doc.text(myProfile?.business_name || '', 15, y + 6);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(myProfile?.address || '', 15, y + 11, { maxWidth: 80 });
+        doc.setFont('helvetica', 'bold');
+        doc.text(`GSTIN: ${myProfile?.gstin || 'N/A'}`, 15, y + 22);
+        doc.text(`State: ${myProfile?.state || 'N/A'}`, 15, y + 26);
 
-        // ─── Itemization Table ───
-        const tableData = invoice.line_items.map((it, i) => [
-            String(i+1).padStart(2, '0'),
-            it.description,
-            it.quantity.toString(),
-            `INR ${it.unit_price.toLocaleString()}`,
+        // Buyer (Right)
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('BILLED TO / RECIPIENT', 115, y);
+        doc.setFontSize(10);
+        doc.text(client?.name || '', 115, y + 6);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(client?.address || '', 115, y + 11, { maxWidth: 80 });
+        doc.setFont('helvetica', 'bold');
+        doc.text(`GSTIN: ${invoice?.gstin_customer || 'N/A'}`, 115, y + 22);
+        doc.text(`Place of Supply: ${invoice?.place_of_supply || 'N/A'}`, 115, y + 26);
+
+        // --- Invoice Metadata ---
+        y += 40;
+        doc.setFillColor(248, 250, 252);
+        doc.rect(15, y, 180, 15, 'F');
+        doc.setFontSize(8);
+        doc.setTextColor(...secondaryColor);
+        doc.text('INVOICE NO', 20, y + 6);
+        doc.text('DATE', 70, y + 6);
+        doc.text('DUE DATE', 120, y + 6);
+        doc.text('STATUS', 170, y + 6);
+        
+        doc.setTextColor(...primaryColor);
+        doc.setFont('helvetica', 'bold');
+        doc.text(invoice.invoice_number, 20, y + 11);
+        doc.text(invoice.invoice_date, 70, y + 11);
+        doc.text(invoice.due_date || 'N/A', 120, y + 11);
+        doc.text(invoice.status.toUpperCase(), 170, y + 11);
+
+        // --- Items Table ---
+        const tableBody = invoice.items.map((it, i) => [
+            i + 1,
+            it.name + (it.hsn_sac ? `\n(HSN: ${it.hsn_sac})` : ''),
+            it.quantity,
+            it.rate.toLocaleString(),
+            it.taxable_value.toLocaleString(),
             `${it.tax_rate}%`,
-            `INR ${it.amount.toLocaleString()}`
+            it.total_amount.toLocaleString()
         ]);
 
         autoTable(doc, {
-            startY: yPos + 30,
-            head: [['Line', 'Description of Services', 'Qty', 'Unit Price', 'Tax', 'Amount']],
-            body: tableData,
-            theme: 'striped',
-            headStyles: { fillColor: [15, 23, 42], fontSize: 9, fontStyle: 'bold', halign: 'center' },
-            bodyStyles: { fontSize: 9, cellPadding: 5 },
+            startY: y + 25,
+            head: [['#', 'Description', 'Qty', 'Rate', 'Taxable', 'GST', 'Amount']],
+            body: tableBody,
+            headStyles: { fillColor: primaryColor, fontSize: 8, fontStyle: 'bold' },
+            bodyStyles: { fontSize: 8 },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 15 },
-                1: { halign: 'left' },
-                2: { halign: 'center', cellWidth: 15 },
-                3: { halign: 'right', cellWidth: 35 },
-                4: { halign: 'center', cellWidth: 15 },
-                5: { halign: 'right', cellWidth: 35 }
+                0: { cellWidth: 10 },
+                2: { halign: 'center' },
+                3: { halign: 'right' },
+                4: { halign: 'right' },
+                5: { halign: 'center' },
+                6: { halign: 'right' }
             }
         });
 
-        // ─── Financial Summary ───
-        let finalY = doc.lastAutoTable.finalY + 15;
+        // --- Totals Section ---
+        let finalY = doc.lastAutoTable.finalY + 10;
+        const summaryX = 130;
         
-        const drawSummaryLine = (label, value, isBold = false, isTotal = false) => {
-            doc.setFontSize(isTotal ? 11 : 9);
-            doc.setFont('helvetica', isBold ? 'bold' : 'normal');
-            doc.setTextColor(isTotal ? 15 : 100, isTotal ? 23 : 116, isTotal ? 42 : 139);
-            
-            doc.text(label, 130, finalY);
-            doc.setTextColor(15, 23, 42);
-            doc.text(`INR ${value.toLocaleString()}`, 190, finalY, { align: 'right' });
-            finalY += isTotal ? 10 : 7;
+        const row = (label, value, bold = false) => {
+            doc.setFont('helvetica', bold ? 'bold' : 'normal');
+            doc.text(label, summaryX, finalY);
+            doc.text(`INR ${value.toLocaleString()}`, 195, finalY, { align: 'right' });
+            finalY += 6;
         };
 
-        drawSummaryLine('Net Subtotal', invoice.subtotal);
-        drawSummaryLine(`Tax (${invoice.tax_type})`, invoice.tax_amount);
-        if (invoice.discount_amount > 0) {
-            drawSummaryLine('Discounts Applied', -invoice.discount_amount);
+        row('Subtotal (Taxable)', invoice.subtotal);
+        if (invoice.cgst_total > 0) {
+            row('CGST Total', invoice.cgst_total);
+            row('SGST Total', invoice.sgst_total);
         }
-        
-        doc.setDrawColor(226, 232, 240);
-        doc.line(130, finalY - 2, 190, finalY - 2);
-        finalY += 5;
-        drawSummaryLine('TOTAL VALUATION', invoice.total, true, true);
-        
-        if (invoice.amount_paid > 0) {
-            drawSummaryLine('Amount Settled', -invoice.amount_paid, false, false);
-            doc.setFont('helvetica', 'bold');
-            drawSummaryLine('BALANCE DUE', invoice.balance_due, true, false);
+        if (invoice.igst_total > 0) {
+            row('IGST Total', invoice.igst_total);
         }
-
-        // ─── Footer & Compliance ───
-        const pageHeight = doc.internal.pageSize.height;
+        row('Round Off', invoice.round_off);
+        
+        doc.setDrawColor(...secondaryColor);
+        doc.line(summaryX, finalY - 2, 195, finalY - 2);
+        finalY += 2;
+        doc.setFontSize(12);
+        row('GRAND TOTAL', invoice.grand_total, true);
+        
         doc.setFontSize(8);
-        doc.setTextColor(148, 163, 184);
-        doc.text('Terms: All payments are due by the specified maturity date. Vitta Ledger Records are system-verified.', 20, pageHeight - 20);
-        doc.text('This is a computer generated document and does not require a physical signature.', 20, pageHeight - 15);
-        doc.text(`Generated via Vitta Protocol on ${new Date().toLocaleString()}`, 190, pageHeight - 15, { align: 'right' });
+        doc.setFont('helvetica', 'italic');
+        doc.text(`Note: ${invoice.grand_total_words}`, 15, finalY);
 
-        doc.save(`Invoice_${invoice.invoice_number}.pdf`);
+        // --- HSN Summary (Rule 46) ---
+        finalY += 15;
+        doc.setFont('helvetica', 'bold');
+        doc.text('HSN / SAC SUMMARY', 15, finalY);
+        finalY += 5;
+        
+        const hsnBody = invoice.hsn_summary.map(h => [
+            h.hsn_sac, h.taxable_value.toLocaleString(), h.tax_rate + '%', 
+            h.cgst_amount.toLocaleString(), h.sgst_amount.toLocaleString(), h.igst_amount.toLocaleString(),
+            h.total_tax.toLocaleString()
+        ]);
+        
+        autoTable(doc, {
+            startY: finalY,
+            head: [['HSN/SAC', 'Taxable Val', 'Rate', 'CGST', 'SGST', 'IGST', 'Tax Amt']],
+            body: hsnBody,
+            theme: 'grid',
+            headStyles: { fillColor: [240, 240, 240], textColor: primaryColor, fontSize: 7 },
+            bodyStyles: { fontSize: 7 }
+        });
+
+        // --- Footer ---
+        const pageHeight = doc.internal.pageSize.height;
+        doc.setFontSize(7);
+        doc.setTextColor(...secondaryColor);
+        doc.text('This is a computer generated Tax Invoice. No signature required.', 105, pageHeight - 15, { align: 'center' });
+        doc.text('Vitta Accounting Compliance Systems v2.0', 105, pageHeight - 10, { align: 'center' });
+
+        doc.save(`${invoice.invoice_number}.pdf`);
+    };
+
+    const generateEinvoice = async () => {
+        try {
+            setGeneratingEinvoice(true);
+            const res = await api.post(`/invoices/${id}/einvoice`);
+            toast.success("IRN Registered Successfully");
+            setInvoice(prev => ({ ...prev, irn: res.data.irn, signed_qr_code: res.data.signed_qr_code, status: "E-Invoiced" }));
+        } catch (e) {
+            toast.error(e.response?.data?.detail || "E-Invoice registration failed");
+        } finally {
+            setGeneratingEinvoice(false);
+        }
     };
 
     if (loading) return (
-        <div className="flex items-center justify-center h-screen bg-white">
-            <div className="animate-spin h-5 w-5 border-2 border-slate-900 border-t-transparent rounded-full" />
+        <div className="flex items-center justify-center h-screen bg-slate-50/30">
+            <Loader2 className="h-8 w-8 text-primary animate-spin opacity-20" />
         </div>
     );
 
     return (
-        <div data-invoice-detail-root className="pb-12 pt-4 px-6 md:px-12 lg:px-20">
-            <FontStyle />
-            
-            {/* Minimal Toolbar */}
-            <div className="max-w-4xl mx-auto flex justify-between items-center mb-6">
-                <Button variant="ghost" size="sm" onClick={() => navigate('/invoices')} className="text-slate-500 hover:text-slate-900 gap-1.5 h-8 px-2">
-                    <ArrowLeft className="h-3.5 w-3.5" /> Dashboard
+        <div className="pb-20 pt-4 px-6 max-w-5xl mx-auto space-y-6">
+            <div className="flex justify-between items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm sticky top-4 z-40">
+                <Button variant="ghost" size="sm" onClick={() => navigate('/invoices')} className="h-9 px-3 text-slate-500 font-bold hover:bg-slate-50">
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Invoices
                 </Button>
-                
-                <div className="flex items-center gap-2">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-md border-slate-200">
-                                <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48 rounded-lg shadow-lg border-slate-100">
-                            <DropdownMenuItem onClick={() => navigate(`/invoices/${id}/edit`)} className="h-9 cursor-pointer text-[13px]">
-                                <Edit className="h-4 w-4 mr-2 text-slate-400" /> Edit Invoice
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={exportPDF} className="h-9 cursor-pointer text-[13px]">
-                                <Printer className="h-4 w-4 mr-2 text-slate-400" /> Print to PDF
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="h-9 cursor-pointer text-[13px] text-rose-600">
-                                <Trash2 className="h-4 w-4 mr-2" /> Delete Record
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
 
-                    {invoice.status === 'draft' ? (
-                        <Button onClick={handleSend} size="sm" className="bg-slate-900 text-white h-8 px-4 text-[13px] font-semibold">
-                            Approve & Send
+                <div className="flex items-center gap-2">
+                    <Badge className="h-7 px-3 bg-emerald-50 text-emerald-600 border-emerald-100 font-black text-[10px] uppercase tracking-widest mr-4">
+                        {invoice.status}
+                    </Badge>
+                    <Separator orientation="vertical" className="h-6" />
+                    
+                    {!invoice.irn && myProfile?.turnover > 50000000 && (
+                        <Button 
+                            disabled={generatingEinvoice} 
+                            onClick={generateEinvoice} 
+                            variant="secondary" 
+                            className="h-9 font-bold text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-100"
+                        >
+                            {generatingEinvoice ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+                            Register IRN
                         </Button>
-                    ) : (invoice.status === 'sent' || invoice.status === 'overdue') ? (
-                        <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
-                            <DialogTrigger asChild>
-                                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-4 text-[13px] font-semibold">
-                                    Record Payment
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-sm rounded-xl py-6 px-6">
-                                <DialogHeader>
-                                    <DialogTitle className="text-lg font-bold">Receive Payment</DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-4 mt-4">
-                                    <div className="space-y-1.5">
-                                        <Label className="text-[11px] font-bold text-slate-500 uppercase">Settlement Amount</Label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₹</span>
-                                            <Input 
-                                                type="number" 
-                                                value={paymentAmount}
-                                                onChange={(e) => setPaymentAmount(e.target.value)}
-                                                className="h-10 pl-7 text-[15px] font-bold"
-                                            />
-                                        </div>
-                                    </div>
-                                    <Button onClick={handleRecordPayment} className="w-full h-10 bg-slate-900 text-white font-bold">
-                                        Sync with Ledger
-                                    </Button>
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-                    ) : (
-                         <Badge className="bg-emerald-50 text-emerald-600 border-none px-3 py-1 font-bold h-8 flex items-center">
-                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> FULLY PAID
-                         </Badge>
                     )}
+
+                    <Button variant="outline" size="sm" onClick={exportPDF} className="h-9 font-bold text-xs border-slate-200 hover:bg-slate-50">
+                        <Printer className="h-4 w-4 mr-2" /> Print PDF
+                    </Button>
+                    <Button onClick={() => navigate(`/invoices/${id}/edit`)} size="sm" className="h-9 bg-slate-900 text-white font-bold text-xs px-5">
+                        <Edit className="h-4 w-4 mr-2" /> Edit Record
+                    </Button>
                 </div>
             </div>
 
-            {/* Professional Document Layout */}
-            <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="max-w-4xl mx-auto professional-paper rounded-lg overflow-hidden"
-            >
-                {/* Slim Header */}
-                <div className="px-10 py-10 border-b border-slate-50 grid grid-cols-2">
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 bg-slate-900 rounded-md flex items-center justify-center">
-                                <Zap className="h-4 w-4 text-emerald-400" />
+            {/* Tax Invoice Document */}
+            <div className="bg-white border border-slate-100 rounded-3xl shadow-2xl shadow-slate-200/50 overflow-hidden min-h-[1000px] flex flex-col">
+                {/* Visual Banner */}
+                <div className="bg-slate-900 p-10 text-white flex justify-between items-end">
+                    <div>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="h-10 w-10 bg-white/10 rounded-xl flex items-center justify-center border border-white/10">
+                                <Landmark className="h-5 w-5 text-emerald-400" />
                             </div>
-                            <span className="text-xl font-black text-slate-900 tracking-tight">Vitta Accounting</span>
+                            <span className="text-2xl font-black tracking-tight">{myProfile?.business_name || 'VITTA'}</span>
                         </div>
-                        <p className="text-[11px] text-slate-400 font-medium">Digital Compliance Infrastructure</p>
+                        <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">{invoice.invoice_type}</p>
                     </div>
-                    <div className="text-right space-y-1">
-                        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Document Registry</h2>
-                        <h3 className="text-2xl font-bold text-slate-900 tabular-nums">{invoice.invoice_number}</h3>
-                        <Badge variant="outline" className={`text-[10px] uppercase font-bold py-0 h-5 ${
-                            invoice.status === 'paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-200'
-                        }`}>
-                            {invoice.status}
-                        </Badge>
+                    <div className="text-right">
+                        <h2 className="text-3xl font-black tabular-nums">{invoice.invoice_number}</h2>
+                        <p className="text-[11px] font-bold text-white/40 mt-1">{invoice.invoice_date}</p>
                     </div>
                 </div>
 
-                <div className="px-10 py-8">
-                    {/* Compact Info Grid */}
-                    <div className="grid grid-cols-12 gap-8 mb-12">
-                        <div className="col-span-12 md:col-span-7 space-y-4">
-                            <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Billing Information</p>
-                                <h4 className="text-[15px] font-bold text-slate-900">{client?.name || 'Customer'}</h4>
-                                <p className="text-[12px] text-slate-500">{client?.business_type || 'Entity'}</p>
-                            </div>
-                            <div className="flex gap-4 pt-2">
-                                <div className="text-[11px] flex gap-2"><span className="text-slate-400 font-bold">Currency:</span> {invoice.currency}</div>
-                                <div className="text-[11px] flex gap-2"><span className="text-slate-400 font-bold">Vault:</span> Internal Ledger</div>
+                <div className="p-10 flex-1 space-y-12">
+                    {/* Biller & Client Grid */}
+                    <div className="grid grid-cols-2 gap-12">
+                        <div className="space-y-4">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-2">Originator (Seller)</h3>
+                            <div className="space-y-1">
+                                <p className="text-sm font-black text-slate-900 uppercase">{myProfile?.business_name}</p>
+                                <p className="text-[12px] text-slate-500 leading-relaxed font-medium">{myProfile?.address}</p>
+                                <div className="pt-2 space-y-0.5">
+                                    <p className="text-[11px] font-bold text-slate-400">GSTIN: <span className="text-slate-900 uppercase">{myProfile?.gstin}</span></p>
+                                    <p className="text-[11px] font-bold text-slate-400">STATE: <span className="text-slate-900 uppercase">{myProfile?.state}</span></p>
+                                </div>
                             </div>
                         </div>
-                        <div className="col-span-12 md:col-span-5 space-y-2 pt-6 md:pt-0">
-                            <div className="data-row">
-                                <span className="data-label">Issued Date</span>
-                                <span className="data-value">{invoice.date}</span>
-                            </div>
-                            <div className="data-row">
-                                <span className="data-label">Due Date</span>
-                                <span className="data-value text-rose-500">{invoice.due_date}</span>
-                            </div>
-                            <div className="data-row">
-                                <span className="data-label">Reference ID</span>
-                                <span className="data-value text-slate-400">#{id.slice(-6)}</span>
+                        <div className="space-y-4">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-2">Recipient (Buyer)</h3>
+                            <div className="space-y-1">
+                                <p className="text-sm font-black text-slate-900 uppercase">{client?.name}</p>
+                                <p className="text-[12px] text-slate-500 leading-relaxed font-medium">{invoice.billing_address}</p>
+                                <div className="pt-2 space-y-0.5">
+                                    <p className="text-[11px] font-bold text-slate-400">GSTIN: <span className="text-slate-900 uppercase">{invoice.gstin_customer || 'UNREGISTERED'}</span></p>
+                                    <p className="text-[11px] font-bold text-slate-400">PLACE OF SUPPLY: <span className="text-slate-900 uppercase">{invoice.place_of_supply}</span></p>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Compact Table */}
-                    <div className="mb-12">
+                    {/* Line Items Table */}
+                    <div className="pt-4">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b-2 border-slate-900">
-                                    <th className="py-2 text-left text-[11px] font-black text-slate-900 uppercase">Service Summary</th>
-                                    <th className="py-2 text-center text-[11px] font-black text-slate-900 uppercase">Qty</th>
-                                    <th className="py-2 text-right text-[11px] font-black text-slate-900 uppercase">Rate</th>
-                                    <th className="py-2 text-right text-[11px] font-black text-slate-900 uppercase pl-8">Total</th>
+                                    <th className="py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">#</th>
+                                    <th className="py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Description of Supply</th>
+                                    <th className="py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">HSN</th>
+                                    <th className="py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Qty</th>
+                                    <th className="py-3 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">UnitPrice</th>
+                                    <th className="py-3 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {invoice.line_items.map((item, i) => (
-                                    <tr key={i}>
-                                        <td className="py-4">
-                                            <p className="text-[13px] font-semibold text-slate-800">{item.description}</p>
-                                            <span className="text-[10px] text-slate-400">{invoice.tax_type} @ {item.tax_rate}%</span>
+                            <tbody className="divide-y divide-slate-50">
+                                {invoice.items.map((item, i) => (
+                                    <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                        <td className="py-5 text-[11px] font-bold text-slate-300">{String(i+1).zfill(2)}</td>
+                                        <td className="py-5">
+                                            <p className="text-xs font-black text-slate-900 mb-0.5">{item.name}</p>
+                                            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-tighter">{item.tax_rate}% TAX APPLIED</p>
                                         </td>
-                                        <td className="py-4 text-center text-[13px] font-medium text-slate-600 tabular-nums">{item.quantity}</td>
-                                        <td className="py-4 text-right text-[13px] font-medium text-slate-600 tabular-nums">₹{(item.unit_price || 0).toLocaleString()}</td>
-                                        <td className="py-4 text-right text-[14px] font-bold text-slate-900 tabular-nums pl-8">₹{(item.amount || 0).toLocaleString()}</td>
+                                        <td className="py-5 text-center text-xs font-bold text-slate-500">{item.hsn_sac}</td>
+                                        <td className="py-5 text-center text-xs font-bold text-slate-900">{item.quantity} {item.unit}</td>
+                                        <td className="py-5 text-right text-xs font-bold text-slate-900">₹{item.rate.toLocaleString()}</td>
+                                        <td className="py-5 text-right text-xs font-black text-slate-900">₹{item.taxable_value.toLocaleString()}</td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
 
-                    {/* Settlement Summary */}
-                    <div className="grid grid-cols-12 gap-8 pt-6 border-t border-slate-100">
-                        <div className="col-span-12 md:col-span-6 space-y-4">
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Compliance Notes</p>
-                                <p className="text-[11px] text-slate-600 leading-relaxed italic">{invoice.notes || 'No standard additional notes.'}</p>
+                    {/* Summary Split */}
+                    <div className="grid grid-cols-12 gap-12 border-t border-slate-100 pt-8">
+                        <div className="col-span-12 lg:col-span-7 space-y-8">
+                            {/* E-Invoice IRN Details */}
+                            {invoice.irn && (
+                                <div className="space-y-3">
+                                    <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-2">Electronic Transaction Audit (IRN)</h4>
+                                    <div className="flex gap-6 items-center bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
+                                        <div className="h-24 w-24 bg-white border border-slate-200 p-2 rounded-xl flex items-center justify-center shrink-0">
+                                            {/* Mock QR Code Visual */}
+                                            <div className="grid grid-cols-4 gap-1 w-full h-full opacity-20">
+                                                {[...Array(16)].map((_, i) => <div key={i} className="bg-slate-900 rounded-sm" />)}
+                                            </div>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Signed IRN Key</p>
+                                            <p className="text-[11px] font-black text-slate-900 break-all mb-4">{invoice.irn}</p>
+                                            <div className="flex gap-4">
+                                                <Badge variant="outline" className="text-[9px] font-black text-emerald-600 bg-white border-emerald-100 uppercase py-1">Digitally Signed (IRP)</Badge>
+                                                <Badge variant="outline" className="text-[9px] font-black text-blue-600 bg-white border-blue-100 uppercase py-1 px-3">B2B Compliance</Badge>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* HSN Summary Table */}
+                            <div className="space-y-3">
+                                <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest">HSN / SAC Summary Audit</h4>
+                                <div className="border border-slate-100 rounded-xl overflow-hidden bg-slate-50/50 p-4">
+                                    <table className="w-full text-[10px]">
+                                        <thead>
+                                            <tr className="text-slate-400 font-bold text-left border-b border-slate-200">
+                                                <th className="pb-2">HSN</th>
+                                                <th className="pb-2 text-right">Taxable</th>
+                                                <th className="pb-2 text-right">CGST</th>
+                                                <th className="pb-2 text-right">SGST</th>
+                                                <th className="pb-2 text-right">IGST</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {invoice.hsn_summary.map((h, i) => (
+                                                <tr key={i} className="text-slate-900 font-bold">
+                                                    <td className="py-2">{h.hsn_sac}</td>
+                                                    <td className="py-2 text-right">₹{h.taxable_value.toLocaleString()}</td>
+                                                    <td className="py-2 text-right">₹{h.cgst_amount.toLocaleString()}</td>
+                                                    <td className="py-2 text-right">₹{h.sgst_amount.toLocaleString()}</td>
+                                                    <td className="py-2 text-right">₹{h.igst_amount.toLocaleString()}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Settlement terms</p>
-                                <p className="text-[11px] text-slate-500 leading-relaxed tabular-nums">{invoice.terms}</p>
+                            
+                            <div className="space-y-2">
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Valuation in Words</p>
+                                <p className="text-[11px] font-black text-slate-900 uppercase italic">Rupees {invoice.grand_total_words}</p>
                             </div>
                         </div>
 
-                        <div className="col-span-12 md:col-span-6 space-y-3">
-                            <div className="data-row border-none">
-                                <span className="data-label">Net Subtotal</span>
-                                <span className="data-value">₹{(invoice.subtotal || 0).toLocaleString()}</span>
+                        <div className="col-span-12 lg:col-span-5 space-y-4">
+                            <div className="flex justify-between text-xs font-bold text-slate-400">
+                                <span>TAXABLE VALUE TOTAL</span>
+                                <span className="text-slate-900 font-black">₹{invoice.subtotal.toLocaleString()}</span>
                             </div>
-                            <div className="data-row border-none">
-                                <span className="data-label">Tax Aggregation</span>
-                                <span className="data-value text-emerald-600">+ ₹{(invoice.tax_amount || 0).toLocaleString()}</span>
-                            </div>
-                            {(invoice.discount_amount || 0) > 0 && (
-                                <div className="data-row border-none">
-                                    <span className="data-label">Discounts</span>
-                                    <span className="data-value text-rose-500">- ₹{(invoice.discount_amount || 0).toLocaleString()}</span>
+                            {invoice.cgst_total > 0 && (
+                                <>
+                                    <div className="flex justify-between text-xs font-bold text-slate-400">
+                                        <span>CENTRAL TAX (CGST)</span>
+                                        <span className="text-emerald-600 font-black">+ ₹{invoice.cgst_total.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs font-bold text-slate-400">
+                                        <span>STATE TAX (SGST)</span>
+                                        <span className="text-emerald-600 font-black">+ ₹{invoice.sgst_total.toLocaleString()}</span>
+                                    </div>
+                                </>
+                            )}
+                            {invoice.igst_total > 0 && (
+                                <div className="flex justify-between text-xs font-bold text-slate-400">
+                                    <span>INTEGRATED TAX (IGST)</span>
+                                    <span className="text-emerald-600 font-black">+ ₹{invoice.igst_total.toLocaleString()}</span>
                                 </div>
                             )}
-                            <div className="data-row border-none pt-2 border-t border-slate-900 mt-2">
-                                <span className="text-[13px] font-black text-slate-900 uppercase">Valuation Total</span>
-                                <span className="text-[20px] font-black text-slate-900 tabular-nums">₹{(invoice.total || 0).toLocaleString()}</span>
+                            <div className="flex justify-between text-xs font-bold text-slate-400">
+                                <span>ROUND OFF / DIFF</span>
+                                <span className="text-slate-900 font-black">{invoice.round_off > 0 ? '+' : ''}₹{invoice.round_off.toFixed(2)}</span>
                             </div>
-                            {(invoice.amount_paid || 0) > 0 && (
-                                <div className="flex justify-between items-center bg-emerald-50 px-3 py-2 rounded mt-2">
-                                    <span className="text-[11px] font-bold text-emerald-700">Accumulated Settlements</span>
-                                    <span className="text-[13px] font-black text-emerald-700">- ₹{(invoice.amount_paid || 0).toLocaleString()}</span>
-                                </div>
-                            )}
+                            <div className="bg-slate-50 p-6 rounded-2xl flex justify-between items-center border border-slate-100">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">RECEIVABLE</span>
+                                <span className="text-2xl font-black text-slate-900 tabular-nums">₹{invoice.grand_total.toLocaleString()}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="px-10 py-6 bg-slate-50 flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    <div className="flex items-center gap-2">
-                        <Zap className="h-3 w-3 text-emerald-500" />
-                        <span>Vitta Ledger Verified</span>
+                <div className="p-10 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                            <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Digitally Verified Ledger</p>
+                        </div>
+                        <p className="text-[9px] text-slate-400 font-bold max-w-xs leading-relaxed uppercase">This is a system generated document per Rule 46 of CGST Rules 2017. Physical signature not required.</p>
                     </div>
-                    <div 
-                        className="flex items-center gap-2 cursor-pointer hover:text-slate-900 transition-colors"
-                        onClick={() => {
-                            navigator.clipboard.writeText(id);
-                            toast.success("Reference ID copied to clipboard");
-                        }}
-                    >
-                        <span>Reference: {id}</span>
-                        <Copy className="h-3 w-3" />
+                    <div className="text-right">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Authenticated on Vitta Protocol</p>
+                        <p className="text-[10px] font-black text-slate-900 tracking-tighter">{id}</p>
                     </div>
                 </div>
-            </motion.div>
+            </div>
+            
+            <div className="flex justify-center p-8 bg-slate-100/50 rounded-3xl border border-dashed border-slate-200">
+                <div className="text-center space-y-4">
+                    <h5 className="font-black text-slate-900 text-xs uppercase tracking-widest">Invoice Controls</h5>
+                    <div className="flex gap-2">
+                        <Button variant="outline" className="h-10 rounded-xl px-6 font-bold text-xs">
+                            <Send className="h-4 w-4 mr-2" /> Dispatch Receipt
+                        </Button>
+                        <Button variant="outline" className="h-10 rounded-xl px-6 font-bold text-xs" onClick={() => navigate('/import')}>
+                            <Landmark className="h-4 w-4 mr-2" /> Sync Payment
+                        </Button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

@@ -2,12 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   User, Shield, Loader2, Save, Key, Download, Upload, 
-  Database, FileSpreadsheet, AlertTriangle, FileJson, RefreshCcw
+  Database, FileSpreadsheet, AlertTriangle, FileJson, RefreshCcw,
+  Building, CheckCircle2, XCircle, AlertCircle, Building2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
+} from '@/components/ui/select';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger 
 } from '@/components/ui/dialog';
@@ -32,10 +37,113 @@ const Settings = () => {
   const [isRestoreOpen, setIsRestoreOpen] = useState(false);
   const [restoreMode, setRestoreMode] = useState('merge');
   const [restoreFile, setRestoreFile] = useState(null);
+  const [companyProfile, setCompanyProfile] = useState({
+    company_name: '',
+    trade_name: '',
+    gstin: '',
+    pan: '',
+    cin: '',
+    business_type: 'Proprietorship',
+    registration_type: 'Regular',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    state_code: '',
+    pincode: '',
+    phone: '',
+    email: '',
+    website: '',
+    annual_turnover: 0,
+    bank_name: '',
+    account_number: '',
+    ifsc_code: '',
+    branch: '',
+  });
+  const [gstinValid, setGstinValid] = useState(null); // null, true, false
+  const [gstinError, setGstinError] = useState('');
+
+  const indianStates = [
+    { code: "01", name: "Jammu & Kashmir" }, { code: "02", name: "Himachal Pradesh" },
+    { code: "03", name: "Punjab" }, { code: "04", name: "Chandigarh" },
+    { code: "05", name: "Uttarakhand" }, { code: "06", name: "Haryana" },
+    { code: "07", name: "Delhi" }, { code: "08", name: "Rajasthan" },
+    { code: "09", name: "Uttar Pradesh" }, { code: "10", name: "Bihar" },
+    { code: "11", name: "Sikkim" }, { code: "12", name: "Arunachal Pradesh" },
+    { code: "13", name: "Nagaland" }, { code: "14", name: "Manipur" },
+    { code: "15", name: "Mizoram" }, { code: "16", name: "Tripura" },
+    { code: "17", name: "Meghalaya" }, { code: "18", name: "Assam" },
+    { code: "19", name: "West Bengal" }, { code: "20", name: "Jharkhand" },
+    { code: "21", name: "Odisha" }, { code: "22", name: "Chhattisgarh" },
+    { code: "23", name: "Madhya Pradesh" }, { code: "24", name: "Gujarat" },
+    { code: "25", name: "Daman & Diu" }, { code: "26", name: "Dadra & Nagar Haveli" },
+    { code: "27", name: "Maharashtra" }, { code: "28", name: "Andhra Pradesh (Old)" },
+    { code: "29", name: "Karnataka" }, { code: "30", name: "Goa" },
+    { code: "31", name: "Lakshadweep" }, { code: "32", name: "Kerala" },
+    { code: "33", name: "Tamil Nadu" }, { code: "34", name: "Puducherry" },
+    { code: "35", name: "Andaman & Nicobar" }, { code: "36", name: "Telangana" },
+    { code: "37", name: "Andhra Pradesh" }, { code: "38", name: "Ladakh" }
+  ];
 
   useEffect(() => {
     fetchUser();
+    fetchCompanyProfile();
   }, []);
+
+  const fetchCompanyProfile = async () => {
+    try {
+      const response = await api.get('/company-profile');
+      if (response.data) {
+        setCompanyProfile(response.data);
+        if (response.data.gstin) {
+          validateGSTIN(response.data.gstin);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load company profile');
+    }
+  };
+
+  const validateGSTIN = async (gstin) => {
+    if (gstin.length !== 15) {
+      setGstinValid(null);
+      setGstinError('');
+      return;
+    }
+
+    try {
+      const response = await api.get(`/validate-gstin/${gstin}`);
+      if (response.data.valid) {
+        setGstinValid(true);
+        setGstinError('');
+        setCompanyProfile(prev => ({
+          ...prev,
+          state: response.data.state_name,
+          state_code: response.data.state_code,
+          pan: response.data.pan
+        }));
+      } else {
+        setGstinValid(false);
+        setGstinError(response.data.error);
+      }
+    } catch (error) {
+      setGstinValid(false);
+      setGstinError('Validation failed');
+    }
+  };
+
+  const handleUpdateCompany = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.put('/company-profile', companyProfile);
+      toast.success('Business profile updated');
+    } catch (error) {
+      toast.error('Failed to update business profile');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchUser = async () => {
     try {
@@ -171,7 +279,270 @@ const Settings = () => {
         </div>
       </div>
 
+      {/* Compliance Banners */}
+      <div className="space-y-3">
+        {companyProfile.gstin && gstinValid ? (
+          <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+            <div>
+              <p className="text-emerald-900 font-bold text-xs uppercase tracking-tight">GST Registered</p>
+              <p className="text-emerald-700 font-medium text-[10px]">All invoices generated will be legally valid Tax Invoices.</p>
+            </div>
+            <Badge className="ml-auto bg-emerald-600 text-white border-none text-[9px] uppercase tracking-widest px-2 py-0.5">Compliant</Badge>
+          </div>
+        ) : (
+          <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600" />
+            <div>
+              <p className="text-amber-900 font-bold text-xs uppercase tracking-tight">Not GST Registered</p>
+              <p className="text-amber-700 font-medium text-[10px]">Invoices will follow the "Bill of Supply" format as per Indian compliance.</p>
+            </div>
+            <Badge className="ml-auto bg-amber-500 text-white border-none text-[9px] uppercase tracking-widest px-2 py-0.5">Basic</Badge>
+          </div>
+        )}
+        
+        {companyProfile.annual_turnover >= 50000000 && (
+          <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-indigo-600" />
+            <div>
+              <p className="text-indigo-900 font-bold text-xs uppercase tracking-tight">E-Invoicing Required</p>
+              <p className="text-indigo-700 font-medium text-[10px]">Your turnover exceeds ₹5 Crore. Government E-Invoicing is mandatory for your business.</p>
+            </div>
+            <Badge className="ml-auto bg-indigo-600 text-white border-none text-[9px] uppercase tracking-widest px-2 py-0.5">Action Needed</Badge>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
+        {/* Business Profile Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm lg:col-span-2"
+        >
+          <div className="flex items-center gap-3 mb-8">
+            <div className="h-10 w-10 bg-primary/5 text-primary rounded-lg flex items-center justify-center">
+              <Building className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Business Identity</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mandatory for GST compliant invoicing</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleUpdateCompany} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+              {/* Basic Details */}
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Legal Company Name</Label>
+                  <Input
+                    value={companyProfile.company_name}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, company_name: e.target.value })}
+                    required
+                    className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Trade Name (Optional)</Label>
+                  <Input
+                    value={companyProfile.trade_name}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, trade_name: e.target.value })}
+                    className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs"
+                  />
+                </div>
+                <div className="space-y-1.5 pt-2">
+                  <div className="flex justify-between items-center mb-1">
+                    <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">GSTIN Number</Label>
+                    {gstinValid === true && <span className="text-[9px] font-black text-emerald-600 flex items-center gap-1 uppercase tracking-widest"><CheckCircle2 className="h-3 w-3" /> Valid</span>}
+                    {gstinValid === false && <span className="text-[9px] font-black text-rose-600 flex items-center gap-1 uppercase tracking-widest"><XCircle className="h-3 w-3" /> {gstinError || 'Invalid'}</span>}
+                  </div>
+                  <Input
+                    value={companyProfile.gstin}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase();
+                      setCompanyProfile({ ...companyProfile, gstin: val });
+                      validateGSTIN(val);
+                    }}
+                    placeholder="22AAAAA0000A1Z5"
+                    className={`rounded-lg h-10 font-bold text-xs uppercase ${gstinValid === true ? 'border-emerald-200 bg-emerald-50/30' : gstinValid === false ? 'border-rose-200 bg-rose-50/30' : 'border-slate-100 bg-slate-50'}`}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">PAN Number</Label>
+                    <Input
+                      value={companyProfile.pan}
+                      onChange={(e) => setCompanyProfile({ ...companyProfile, pan: e.target.value.toUpperCase() })}
+                      className="rounded-lg border-slate-100 bg-slate-100/50 h-10 font-bold text-xs uppercase"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Annual Turnover (₹)</Label>
+                    <Input
+                      type="number"
+                      value={companyProfile.annual_turnover}
+                      onChange={(e) => setCompanyProfile({ ...companyProfile, annual_turnover: parseFloat(e.target.value) })}
+                      className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs uppercase"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Address & Registration */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Business Type</Label>
+                    <Select value={companyProfile.business_type} onValueChange={(v) => setCompanyProfile({...companyProfile, business_type: v})}>
+                      <SelectTrigger className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["Proprietorship", "Partnership", "LLP", "Pvt Ltd", "Public Ltd", "Trust", "HUF"].map(type => (
+                          <SelectItem key={type} value={type} className="font-bold text-xs">{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registration Type</Label>
+                    <Select value={companyProfile.registration_type} onValueChange={(v) => setCompanyProfile({...companyProfile, registration_type: v})}>
+                      <SelectTrigger className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["Regular", "Composition", "Unregistered", "SEZ", "Import/Export"].map(type => (
+                          <SelectItem key={type} value={type} className="font-bold text-xs">{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Official Address</Label>
+                  <Input
+                    value={companyProfile.address_line1}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, address_line1: e.target.value })}
+                    placeholder="Building, Street Name"
+                    className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs"
+                  />
+                  <Input
+                    value={companyProfile.address_line2}
+                    onChange={(e) => setCompanyProfile({ ...companyProfile, address_line2: e.target.value })}
+                    placeholder="Locality, Landmark"
+                    className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs mt-2"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">City</Label>
+                    <Input
+                      value={companyProfile.city}
+                      onChange={(e) => setCompanyProfile({ ...companyProfile, city: e.target.value })}
+                      className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">State (Place of Supply)</Label>
+                    <Select value={companyProfile.state} onValueChange={(v) => {
+                      const state = indianStates.find(s => s.name === v);
+                      setCompanyProfile({...companyProfile, state: v, state_code: state?.code || ''});
+                    }}>
+                      <SelectTrigger className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {indianStates.map(s => (
+                          <SelectItem key={s.code} value={s.name} className="font-bold text-xs">{s.name} ({s.code})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Separator className="bg-slate-50" />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Banking Details */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Building2 className="h-4 w-4 text-slate-400" />
+                  <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[.15em]">Treasury & Banking</h4>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bank Name</Label>
+                    <Input
+                      value={companyProfile.bank_name}
+                      onChange={(e) => setCompanyProfile({ ...companyProfile, bank_name: e.target.value })}
+                      className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">IFSC Code</Label>
+                      <Input
+                        value={companyProfile.ifsc_code}
+                        onChange={(e) => setCompanyProfile({ ...companyProfile, ifsc_code: e.target.value.toUpperCase() })}
+                        className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs uppercase"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Account Number</Label>
+                      <Input
+                        value={companyProfile.account_number}
+                        onChange={(e) => setCompanyProfile({ ...companyProfile, account_number: e.target.value })}
+                        className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="h-4 w-4 rounded-full bg-slate-100" />
+                  <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[.15em]">Liaison & Communications</h4>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Official Email</Label>
+                    <Input
+                      type="email"
+                      value={companyProfile.email}
+                      onChange={(e) => setCompanyProfile({ ...companyProfile, email: e.target.value })}
+                      className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Official Phone</Label>
+                    <Input
+                      value={companyProfile.phone}
+                      onChange={(e) => setCompanyProfile({ ...companyProfile, phone: e.target.value })}
+                      className="rounded-lg border-slate-100 bg-slate-50 h-10 font-bold text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Button type="submit" disabled={loading} className="w-full h-11 rounded-xl bg-slate-900 hover:bg-black text-white font-black text-[11px] uppercase tracking-widest shadow-xl shadow-slate-100 transition-all active:scale-95 group">
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Save className="h-4 w-4 opacity-70 group-hover:opacity-100 transition-opacity" />
+                  Update Global Business Profile
+                </span>
+              )}
+            </Button>
+          </form>
+        </motion.div>
+
         {/* Profile Settings */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}

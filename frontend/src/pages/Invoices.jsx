@@ -221,9 +221,16 @@ const Invoices = () => {
                                             <Badge variant="outline" className="text-[10px] font-black bg-white border-slate-200 px-2 py-0 h-5 tabular-nums">{inv.due_date}</Badge>
                                         </td>
                                         <td className="px-6 py-4 text-center">
-                                            <Badge className={`text-[10px] font-black uppercase px-3 h-6 rounded-md ${getStatusStyle(inv.status)}`}>
-                                                {inv.status}
-                                            </Badge>
+                                            <div className="flex flex-col items-center gap-1">
+                                                <Badge className={`text-[10px] font-black uppercase px-3 h-6 rounded-md ${getStatusStyle(inv.status)}`}>
+                                                    {inv.status}
+                                                </Badge>
+                                                {inv.irn && (
+                                                    <Badge className="bg-amber-50 text-amber-700 border-amber-100 text-[8px] font-black uppercase h-4 px-1.5 flex items-center gap-1">
+                                                        <Zap className="h-2 w-2" /> IRN Active
+                                                    </Badge>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex justify-end items-center gap-1 transition-all">

@@ -156,6 +156,9 @@ class User(BaseModel):
 class ClientCreate(BaseModel):
     name: str
     business_type: Optional[str] = None
+    gstin: Optional[str] = None
+    address: Optional[str] = None
+    state: Optional[str] = None
     currency: str = "INR"
     country: str = "India"
     notes: Optional[str] = None
@@ -166,6 +169,9 @@ class Client(BaseModel):
     user_id: str
     name: str
     business_type: Optional[str] = None
+    gstin: Optional[str] = None
+    address: Optional[str] = None
+    state: Optional[str] = None
     currency: str
     country: str
     notes: Optional[str] = None
@@ -217,6 +223,7 @@ class CategoryCreate(BaseModel):
     name: str
     type: str  # "income" or "expense"
     color: str = "#0F392B"
+    schedule_iii_head: Optional[str] = None # e.g. "Employee Benefits", "Finance Costs"
 
 class Category(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -225,6 +232,7 @@ class Category(BaseModel):
     name: str
     type: str
     color: str
+    schedule_iii_head: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class TransactionCreate(BaseModel):
@@ -259,50 +267,92 @@ class Transaction(BaseModel):
     metadata: Optional[dict] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-class InvoiceLineItem(BaseModel):
-    description: str
-    quantity: float = 1
-    unit_price: float
-    tax_rate: float = 0  
-    amount: float  # quantity * unit_price
-    tax_amount: float  # amount * tax_rate / 100
+class InvoiceItem(BaseModel):
+    item_id: str
+    name: str
+    description: Optional[str] = None
+    hsn_sac: str
+    quantity: float
+    unit: str
+    rate: float
+    tax_rate: float
+    discount_percent: float = 0
+    taxable_value: float
+    cgst_rate: float = 0
+    cgst_amount: float = 0
+    sgst_rate: float = 0
+    sgst_amount: float = 0
+    igst_rate: float = 0
+    igst_amount: float = 0
+    total_amount: float
 
-class InvoiceCreate(BaseModel):
-    client_id: str
-    account_id: str 
-    invoice_number: Optional[str] = None
-    date: str 
-    due_date: str 
-    line_items: List[InvoiceLineItem]
-    notes: Optional[str] = None
-    terms: Optional[str] = None
-    tax_type: str = "GST"
-    discount_type: Optional[str] = None
-    discount_value: float = 0
-    currency: str = "INR"
+class HSNSummary(BaseModel):
+    hsn_sac: str
+    taxable_value: float
+    tax_rate: float
+    cgst_amount: float = 0
+    sgst_amount: float = 0
+    igst_amount: float = 0
+    total_tax: float
 
 class Invoice(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
     client_id: str
-    account_id: str
     invoice_number: str
-    date: str
-    due_date: str
-    items: List[InvoiceLineItem]
-    tax_amount: float
-    total: float
-    amount_paid: float = 0
-    balance_due: float
+    invoice_type: str = "Tax Invoice" # Tax Invoice or Bill of Supply
+    invoice_date: str
+    due_date: Optional[str] = None
+    place_of_supply: str # State name
+    billing_address: str
+    shipping_address: Optional[str] = None
+    gstin_customer: Optional[str] = None
+    items: List[InvoiceItem]
+    hsn_summary: List[HSNSummary]
+    subtotal: float
+    total_tax: float
+    cgst_total: float = 0
+    sgst_total: float = 0
+    igst_total: float = 0
+    round_off: float = 0
+    grand_total: float
+    grand_total_words: str
+    status: str = "Draft" # Draft, Sent, Paid, Void
     notes: Optional[str] = None
     terms: Optional[str] = None
-    tax_type: str = "GST"
+    irn: Optional[str] = None # For E-Invoice
+    signed_qr_code: Optional[str] = None # For E-Invoice
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     currency: str = "INR"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
     sent_at: Optional[datetime] = None
     paid_at: Optional[datetime] = None
+
+class InvoiceCreate(BaseModel):
+    client_id: str
+    invoice_date: str
+    due_date: Optional[str] = None
+    place_of_supply: str
+    billing_address: str
+    shipping_address: Optional[str] = None
+    gstin_customer: Optional[str] = None
+    items: List[InvoiceItem]
+    hsn_summary: List[HSNSummary]
+    subtotal: float
+    total_tax: float
+    cgst_total: float = 0
+    sgst_total: float = 0
+    igst_total: float = 0
+    round_off: float = 0
+    grand_total: float
+    grand_total_words: str
+    status: str = "Draft"
+    notes: Optional[str] = None
+    terms: Optional[str] = None
+    currency: str = "INR"
 
 class AuditLog(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -328,6 +378,7 @@ class AutomationRule(BaseModel):
     category_id: str
     is_active: bool
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 
 # ==================== HELPERS ====================
 
@@ -367,6 +418,49 @@ class PasswordUpdate(BaseModel):
     current_password: str
     new_password: str
 
+class CompanyProfile(BaseModel):
+    user_id: str
+    company_name: str
+    trade_name: Optional[str] = None
+    gstin: Optional[str] = None
+    pan: Optional[str] = None
+    cin: Optional[str] = None
+    business_type: str
+    registration_type: str
+    address_line1: str
+    address_line2: Optional[str] = None
+    city: str
+    state: str
+    state_code: str
+    pincode: str
+    country: str = "India"
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    website: Optional[str] = None
+    annual_turnover: Optional[float] = None
+    fiscal_year_start: str = "April"
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
+    ifsc_code: Optional[str] = None
+    branch: Optional[str] = None
+    logo_url: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Item(BaseModel):
+    id: Optional[str] = None
+    user_id: str
+    name: str
+    description: Optional[str] = None
+    hsn_sac: str
+    unit: str = "PCS" # PCS, BOX, MTR, KG, NOS, SAC (for services)
+    item_type: str = "Goods" # Goods or Service
+    tax_rate: float = 18.0 # Default 18%
+    sale_price: float
+    is_tax_inclusive: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # ==================== AUTH HELPERS ====================
 
 def verify_password(plain_password, hashed_password):
@@ -401,6 +495,143 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     return User(**user)
 
+
+# ==================== SCHEDULE III REPORTS ====================
+
+@api_router.get("/reports/pnl")
+async def get_schedule_iii_pnl(
+    date_from: str = None, 
+    date_to: str = None, 
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Statement of Profit and Loss (Schedule III)
+    """
+    query = {"user_id": current_user.id}
+    if date_from and date_to:
+        query["date"] = {"$gte": date_from, "$lte": date_to}
+        
+    transactions = await db.transactions.find(query).to_list(100000)
+    
+    # Revenue from Operations, Other Income
+    income_categories = await db.categories.find({"user_id": current_user.id, "type": "income"}).to_list(1000)
+    # Expenses (Employee Benefits, Finance costs, etc)
+    expense_categories = await db.categories.find({"user_id": current_user.id, "type": "expense"}).to_list(1000)
+    
+    income_map = {str(c["_id"]): c for c in income_categories}
+    expense_map = {str(c["_id"]): c for c in expense_categories}
+    
+    # Aggregation
+    revenue_ops = 0
+    other_income = 0
+    
+    cost_materials = 0
+    employee_benefits = 0
+    finance_costs = 0
+    depreciation = 0
+    other_expenses = 0
+    
+    for tx in transactions:
+        amount = tx["amount"]
+        cid = tx.get("category_id")
+        
+        if cid in income_map:
+            head = income_map[cid].get("schedule_iii_head", "Other Income")
+            if head == "Revenue from Operations": revenue_ops += amount
+            else: other_income += amount
+        elif cid in expense_map:
+            head = expense_map[cid].get("schedule_iii_head", "Other Expenses")
+            if head == "Employee Benefits": employee_benefits += amount
+            elif head == "Finance Costs": finance_costs += amount
+            elif head == "Depreciation": depreciation += amount
+            elif head == "Cost of Materials": cost_materials += amount
+            else: other_expenses += amount
+            
+    total_revenue = revenue_ops + other_income
+    total_expenses = cost_materials + employee_benefits + finance_costs + depreciation + other_expenses
+    profit_before_tax = total_revenue - total_expenses
+    current_tax = profit_before_tax * 0.25 if profit_before_tax > 0 else 0 # Dummy 25% tax
+    net_profit = profit_before_tax - current_tax
+    
+    return {
+        "revenue": {
+            "revenue_from_operations": revenue_ops,
+            "other_income": other_income,
+            "total_revenue": total_revenue
+        },
+        "expenses": {
+            "cost_of_materials": cost_materials,
+            "employee_benefit_expenses": employee_benefits,
+            "finance_costs": finance_costs,
+            "depreciation": depreciation,
+            "other_expenses": other_expenses,
+            "total_expenses": total_expenses
+        },
+        "profit_before_tax": profit_before_tax,
+        "tax_expense": {
+            "current_tax": current_tax,
+            "deferred_tax": 0
+        },
+        "profit_for_period": net_profit
+    }
+
+@api_router.get("/reports/schedule-iii-balance-sheet")
+async def get_schedule_iii_bs(
+    as_of_date: str = None, 
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Balance Sheet (Schedule III)
+    """
+    # Simply mapping existing logic to Schedule III heads
+    accounts = await db.bank_accounts.find({"user_id": current_user.id}).to_list(100)
+    
+    cash_equivalents = sum(a["balance"] for a in accounts if a["account_type"] in ["Bank", "Cash"])
+    current_loans = sum(abs(a["balance"]) for a in accounts if a["account_type"] == "Card" and a["balance"] < 0)
+    
+    # Calculate Equity from all time P&L
+    all_income = await db.transactions.find({"user_id": current_user.id, "type": "credit"}).to_list(100000)
+    all_expense = await db.transactions.find({"user_id": current_user.id, "type": "debit"}).to_list(100000)
+    
+    total_inc = sum(t["amount"] for t in all_income)
+    total_exp = sum(t["amount"] for t in all_expense)
+    retained_earnings = total_inc - total_exp
+    
+    return {
+        "equity_and_liabilities": {
+            "shareholders_funds": {
+                "share_capital": 500000, # Dummy initial capital
+                "reserves_and_surplus": retained_earnings,
+                "total": 500000 + retained_earnings
+            },
+            "non_current_liabilities": {
+                "long_term_borrowings": 0,
+                "total": 0
+            },
+            "current_liabilities": {
+                "short_term_borrowings": current_loans,
+                "trade_payables": 0,
+                "total": current_loans
+            },
+            "total": 500000 + retained_earnings + current_loans
+        },
+        "assets": {
+            "non_current_assets": {
+                "fixed_assets": 0,
+                "non_current_investments": 0,
+                "total": 0
+            },
+            "current_assets": {
+                "inventories": 0,
+                "trade_receivables": 0,
+                "cash_and_equivalents": cash_equivalents,
+                "total": cash_equivalents
+            },
+            "total": cash_equivalents
+        },
+        "is_balanced": (500000 + retained_earnings + current_loans) == cash_equivalents
+    }
+
 # ==================== UTILITIES ====================
 
 # Keywords for identifying transaction headers in bank statements
@@ -419,6 +650,99 @@ header_keywords = {
     "Notes": ["notes", "note", "remarks", "memo", "comment", "comments"],
     "Branch": ["branch", "branch name"]
 }
+
+def validate_gstin(gstin: str) -> dict:
+    """
+    GSTIN format: 22AAAAA0000A1Z5
+    Position 1-2: State Code (01-38)
+    Position 3-12: PAN of the entity
+    Position 13: Entity number (1-9, A-Z)
+    Position 14: 'Z' by default
+    Position 15: Checksum digit/character
+    """
+    pattern = r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$'
+    if not re.match(pattern, gstin):
+        return {"valid": False, "error": "Invalid GSTIN format"}
+    
+    state_code = gstin[:2]
+    valid_state_codes = {
+        "01": "Jammu & Kashmir", "02": "Himachal Pradesh", "03": "Punjab",
+        "04": "Chandigarh", "05": "Uttarakhand", "06": "Haryana",
+        "07": "Delhi", "08": "Rajasthan", "09": "Uttar Pradesh",
+        "10": "Bihar", "11": "Sikkim", "12": "Arunachal Pradesh",
+        "13": "Nagaland", "14": "Manipur", "15": "Mizoram",
+        "16": "Tripura", "17": "Meghalaya", "18": "Assam",
+        "19": "West Bengal", "20": "Jharkhand", "21": "Odisha",
+        "22": "Chhattisgarh", "23": "Madhya Pradesh", "24": "Gujarat",
+        "25": "Daman & Diu", "26": "Dadra & Nagar Haveli",
+        "27": "Maharashtra", "28": "Andhra Pradesh (Old)",
+        "29": "Karnataka", "30": "Goa", "31": "Lakshadweep",
+        "32": "Kerala", "33": "Tamil Nadu", "34": "Puducherry",
+        "35": "Andaman & Nicobar", "36": "Telangana",
+        "37": "Andhra Pradesh", "38": "Ladakh"
+    }
+    
+    if state_code not in valid_state_codes:
+        return {"valid": False, "error": f"Invalid state code: {state_code}"}
+    
+    pan = gstin[2:12]
+    state_name = valid_state_codes[state_code]
+    
+    return {"valid": True, "state_code": state_code, "state_name": state_name, "pan": pan}
+
+def amount_to_words(num):
+    """
+    Converts a number to Indian currency format words.
+    Example: 1234.56 -> One Thousand Two Hundred Thirty Four and Fifty Six Paisa Only
+    """
+    def get_words(n):
+        units = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", 
+                 "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"]
+        tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
+        
+        if n < 20: return units[int(n)]
+        if n < 100: return tens[int(n // 10)] + ((" " + units[int(n % 10)]) if n % 10 != 0 else "")
+        if n < 1000: return units[int(n // 100)] + " Hundred" + ((" and " + get_words(n % 100)) if n % 100 != 0 else "")
+        if n < 100000: return get_words(n // 1000) + " Thousand" + ((" " + get_words(n % 1000)) if n % 1000 != 0 else "")
+        if n < 10000000: return get_words(n // 100000) + " Lakh" + ((" " + get_words(n % 100000)) if n % 100000 != 0 else "")
+        return get_words(n // 10000000) + " Crore" + ((" " + get_words(n % 10000000)) if n % 10000000 != 0 else "")
+
+    if num == 0: return "Zero Rupees Only"
+    
+    parts = str(float(num)).split('.')
+    rupees = int(parts[0])
+    paisa = int(parts[1][:2]) if len(parts) > 1 else 0
+    
+    res = get_words(rupees) + " Rupees"
+    if paisa > 0:
+        res += " and " + get_words(paisa) + " Paisa"
+    return res + " Only"
+
+async def generate_invoice_number(user_id: str):
+    """
+    Generates sequential invoice number: VT/2024-25/0001
+    """
+    now = datetime.now(timezone.utc)
+    # Fiscal year calculation (April to March)
+    if now.month >= 4:
+        fy = f"{now.year}-{str(now.year + 1)[2:]}"
+    else:
+        fy = f"{now.year - 1}-{str(now.year)[2:]}"
+        
+    config = await db.vitta_config.find_one({"user_id": user_id, "key": "invoice_counter"})
+    if not config:
+        counter = 1
+        await db.vitta_config.insert_one({"user_id": user_id, "key": "invoice_counter", "value": counter, "fy": fy})
+    else:
+        # If fiscal year changed, reset counter
+        if config.get("fy") != fy:
+            counter = 1
+            await db.vitta_config.update_one({"user_id": user_id, "key": "invoice_counter"}, {"$set": {"value": counter, "fy": fy}})
+        else:
+            counter = config["value"] + 1
+            await db.vitta_config.update_one({"user_id": user_id, "key": "invoice_counter"}, {"$inc": {"value": 1}})
+            
+    return f"VT/{fy}/{str(counter).zfill(4)}"
 
 def normalize_date(date_str):
     if not date_str or not isinstance(date_str, str):
@@ -563,6 +887,268 @@ async def update_password(password_data: PasswordUpdate, current_user: User = De
     await db.users.update_one({"id": current_user.id}, {"$set": {"password_hash": new_hash}})
     
     return {"message": "Password updated successfully"}
+
+# ==================== COMPANY PROFILE ROUTES ====================
+
+@api_router.get("/company-profile", response_model=Optional[CompanyProfile])
+async def get_company_profile(current_user: User = Depends(get_current_user)):
+    profile = await db.company_profiles.find_one({"user_id": current_user.id}, {"_id": 0})
+    if not profile:
+        return None
+    
+    # Handle datetime deserialization
+    for field in ['created_at', 'updated_at']:
+        if isinstance(profile.get(field), str):
+            profile[field] = datetime.fromisoformat(profile[field])
+            
+    return CompanyProfile(**profile)
+
+@api_router.post("/company-profile", response_model=CompanyProfile)
+async def create_company_profile(profile_data: CompanyProfile, current_user: User = Depends(get_current_user)):
+    profile_data.user_id = current_user.id
+    
+    # Check if profile already exists
+    existing = await db.company_profiles.find_one({"user_id": current_user.id})
+    if existing:
+        raise HTTPException(status_code=400, detail="Company profile already exists. Use PUT to update.")
+    
+    profile_dict = profile_data.model_dump()
+    profile_dict['created_at'] = profile_dict['created_at'].isoformat()
+    profile_dict['updated_at'] = profile_dict['updated_at'].isoformat()
+    
+    await db.company_profiles.insert_one(profile_dict)
+    await log_action(current_user.id, "create", "company_profile", f"Created company profile: {profile_data.company_name}")
+    
+    return profile_data
+
+@api_router.put("/company-profile", response_model=CompanyProfile)
+async def update_company_profile(profile_data: CompanyProfile, current_user: User = Depends(get_current_user)):
+    profile_data.user_id = current_user.id
+    profile_data.updated_at = datetime.now(timezone.utc)
+    
+    profile_dict = profile_data.model_dump()
+    profile_dict['created_at'] = profile_dict['created_at'].isoformat() if isinstance(profile_dict['created_at'], datetime) else profile_dict['created_at']
+    profile_dict['updated_at'] = profile_dict['updated_at'].isoformat()
+    
+    result = await db.company_profiles.update_one(
+        {"user_id": current_user.id},
+        {"$set": profile_dict},
+        upsert=True
+    )
+    
+    await log_action(current_user.id, "update", "company_profile", f"Updated company profile: {profile_data.company_name}")
+    return profile_data
+
+@api_router.get("/validate-gstin/{gstin}")
+async def api_validate_gstin(gstin: str):
+    return validate_gstin(gstin.upper())
+
+# ==================== INVOICE ROUTES ====================
+
+@api_router.get("/invoices", response_model=List[Invoice])
+async def get_invoices(current_user: User = Depends(get_current_user)):
+    cursor = db.invoices.find({"user_id": current_user.id})
+    invoices = []
+    async for doc in cursor:
+        doc['id'] = str(doc['_id'])
+        invoices.append(Invoice(**doc))
+    return invoices
+
+@api_router.post("/invoices", response_model=Invoice)
+async def create_invoice(invoice: Invoice, current_user: User = Depends(get_current_user)):
+    invoice.user_id = current_user.id
+    
+    # Auto-generate invoice number if not provided
+    if not invoice.invoice_number or invoice.invoice_number == "AUTO":
+        invoice.invoice_number = await generate_invoice_number(current_user.id)
+        
+    # Get Company Profile for Tax Logic
+    profile = await db.company_profiles.find_one({"user_id": current_user.id})
+    if not profile and invoice.invoice_type == "Tax Invoice":
+        raise HTTPException(status_code=400, detail="Company profile required for Tax Invoices. Complete Settings first.")
+    
+    my_state = profile.get("state") if profile else None
+    
+    # Recalculate Taxes and Totals Server-side for accuracy
+    subtotal = 0
+    cgst_total = 0
+    sgst_total = 0
+    igst_total = 0
+    hsn_map = {} # hsn -> {taxable, cgst, sgst, igst, rate}
+    
+    for item in invoice.items:
+        # Calculate taxable value: (Qty * Rate) - Discount
+        base_value = item.quantity * item.rate
+        item.taxable_value = base_value - (base_value * item.discount_percent / 100)
+        
+        # Determine Tax Type (CGST/SGST vs IGST)
+        is_inter_state = invoice.place_of_supply != my_state
+        
+        if is_inter_state:
+            item.igst_rate = item.tax_rate
+            item.igst_amount = item.taxable_value * (item.igst_rate / 100)
+            item.cgst_rate = 0
+            item.cgst_amount = 0
+            item.sgst_rate = 0
+            item.sgst_amount = 0
+        else:
+            item.igst_rate = 0
+            item.igst_amount = 0
+            item.cgst_rate = item.tax_rate / 2
+            item.cgst_amount = item.taxable_value * (item.cgst_rate / 100)
+            item.sgst_rate = item.tax_rate / 2
+            item.sgst_amount = item.taxable_value * (item.sgst_rate / 100)
+            
+        item.total_amount = item.taxable_value + item.cgst_amount + item.sgst_amount + item.igst_amount
+        
+        # Accumulate totals
+        subtotal += item.taxable_value
+        cgst_total += item.cgst_amount
+        sgst_total += item.sgst_amount
+        igst_total += item.igst_amount
+        
+        # Update HSN Summary
+        hsn = item.hsn_sac
+        if hsn not in hsn_map:
+            hsn_map[hsn] = {"taxable": 0, "cgst": 0, "sgst": 0, "igst": 0, "rate": item.tax_rate}
+        
+        hsn_map[hsn]["taxable"] += item.taxable_value
+        hsn_map[hsn]["cgst"] += item.cgst_amount
+        hsn_map[hsn]["sgst"] += item.sgst_amount
+        hsn_map[hsn]["igst"] += item.igst_amount
+
+    # Build HSN Summary List
+    invoice.hsn_summary = [
+        HSNSummary(
+            hsn_sac=h, 
+            taxable_value=v["taxable"], 
+            tax_rate=v["rate"],
+            cgst_amount=v["cgst"],
+            sgst_amount=v["sgst"],
+            igst_amount=v["igst"],
+            total_tax=v["cgst"] + v["sgst"] + v["igst"]
+        ) for h, v in hsn_map.items()
+    ]
+    
+    invoice.subtotal = subtotal
+    invoice.cgst_total = cgst_total
+    invoice.sgst_total = sgst_total
+    invoice.igst_total = igst_total
+    invoice.total_tax = cgst_total + sgst_total + igst_total
+    
+    total_raw = subtotal + invoice.total_tax
+    invoice.grand_total = round(total_raw)
+    invoice.round_off = invoice.grand_total - total_raw
+    invoice.grand_total_words = amount_to_words(invoice.grand_total)
+    
+    invoice_dict = invoice.model_dump(exclude={"id"})
+    invoice_dict['created_at'] = invoice_dict['created_at'].isoformat()
+    invoice_dict['updated_at'] = invoice_dict['updated_at'].isoformat()
+    
+    result = await db.invoices.insert_one(invoice_dict)
+    invoice.id = str(result.inserted_id)
+    
+    await log_action(current_user.id, "create", "invoice", f"Created invoice: {invoice.invoice_number}")
+    return invoice
+
+@api_router.get("/invoices/{invoice_id}", response_model=Invoice)
+async def get_invoice(invoice_id: str, current_user: User = Depends(get_current_user)):
+    doc = await db.invoices.find_one({"_id": ObjectId(invoice_id), "user_id": current_user.id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    doc['id'] = str(doc['_id'])
+    return Invoice(**doc)
+
+@api_router.delete("/invoices/{invoice_id}")
+async def delete_invoice(invoice_id: str, current_user: User = Depends(get_current_user)):
+    await db.invoices.delete_one({"_id": ObjectId(invoice_id), "user_id": current_user.id})
+    await log_action(current_user.id, "delete", "invoice", f"Deleted invoice ID: {invoice_id}")
+    return {"message": "Invoice deleted"}
+
+@api_router.post("/invoices/{invoice_id}/einvoice")
+async def generate_einvoice(invoice_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Mock IRP (Invoice Registration Portal) Integration.
+    In production, this would call NIC/ClearTax/Taxmann API.
+    """
+    invoice_doc = await db.invoices.find_one({"_id": ObjectId(invoice_id), "user_id": current_user.id})
+    if not invoice_doc:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    if invoice_doc.get("irn"):
+        return {"message": "E-Invoice already generated", "irn": invoice_doc["irn"]}
+        
+    # Validation
+    if not invoice_doc.get("gstin_customer"):
+        raise HTTPException(status_code=400, detail="Customer GSTIN required for E-Invoice")
+        
+    # Mocking IRN Generation (SHA-256 of SellerGSTIN + InvoiceNo + FY)
+    import hashlib
+    irn_base = f"{current_user.id}{invoice_doc['invoice_number']}2024-25"
+    irn = hashlib.sha256(irn_base.encode()).hexdigest().upper()
+    
+    # Mock Signed QR Code (In reality, a JWT from NIC)
+    signed_qr = f"MOCK_QR_{irn[:20]}"
+    
+    await db.invoices.update_one(
+        {"_id": ObjectId(invoice_id)},
+        {"$set": {
+            "irn": irn,
+            "signed_qr_code": signed_qr,
+            "status": "E-Invoiced",
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    await log_action(current_user.id, "generate_einvoice", "invoice", f"IRN Generated for {invoice_doc['invoice_number']}")
+    return {"message": "E-Invoice Generated", "irn": irn, "signed_qr_code": signed_qr}
+
+# ==================== ITEM / PRODUCT ROUTES ====================
+
+@api_router.get("/items", response_model=List[Item])
+async def get_items(current_user: User = Depends(get_current_user)):
+    cursor = db.items.find({"user_id": current_user.id})
+    items = []
+    async for doc in cursor:
+        doc['id'] = str(doc['_id'])
+        items.append(Item(**doc))
+    return items
+
+@api_router.post("/items", response_model=Item)
+async def create_item(item: Item, current_user: User = Depends(get_current_user)):
+    item.user_id = current_user.id
+    item_dict = item.model_dump(exclude={"id"})
+    
+    # Handle dates
+    item_dict['created_at'] = item_dict['created_at'].isoformat()
+    item_dict['updated_at'] = item_dict['updated_at'].isoformat()
+    
+    result = await db.items.insert_one(item_dict)
+    item.id = str(result.inserted_id)
+    
+    await log_action(current_user.id, "create", "item", f"Created item: {item.name}")
+    return item
+
+@api_router.put("/items/{item_id}", response_model=Item)
+async def update_item(item_id: str, item: Item, current_user: User = Depends(get_current_user)):
+    item_dict = item.model_dump(exclude={"id", "user_id", "created_at"})
+    item_dict['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    await db.items.update_one(
+        {"_id": ObjectId(item_id), "user_id": current_user.id},
+        {"$set": item_dict}
+    )
+    
+    await log_action(current_user.id, "update", "item", f"Updated item: {item.name}")
+    return item
+
+@api_router.delete("/items/{item_id}")
+async def delete_item(item_id: str, current_user: User = Depends(get_current_user)):
+    await db.items.delete_one({"_id": ObjectId(item_id), "user_id": current_user.id})
+    await log_action(current_user.id, "delete", "item", f"Deleted item ID: {item_id}")
+    return {"message": "Item deleted"}
+
+# ==================== BANK ACCOUNT ROUTES ====================
 
 # ==================== BANK ACCOUNT ROUTES ====================
 
@@ -1179,56 +1765,47 @@ async def create_invoice(data: InvoiceCreate, current_user: User = Depends(get_c
     client = await db.clients.find_one({"id": data.client_id, "user_id": current_user.id})
     if not client: raise HTTPException(status_code=404, detail="Client not found")
     
-    account = await db.accounts.find_one({"id": data.account_id, "user_id": current_user.id})
-    if not account: raise HTTPException(status_code=404, detail="Account not found")
+    # 2. Sequence Generation
+    year = "2024-25" # Mock fiscal year
+    last_inv = await db.invoices.find({"user_id": current_user.id}).sort("created_at", -1).limit(1).to_list(1)
+    seq = 1
+    if last_inv:
+        try:
+            parts = last_inv[0]['invoice_number'].split('/')
+            seq = int(parts[-1]) + 1
+        except: seq = 1
+    inv_num = f"VITTA/{year}/{seq:04d}"
 
-    # 2. Generate Invoice Number
-    inv_num = data.invoice_number
-    if not inv_num:
-        year = datetime.now().year
-        last_inv = await db.invoices.find({"user_id": current_user.id}).sort("created_at", -1).limit(1).to_list(1)
-        seq = 1
-        if last_inv:
-            try:
-                parts = last_inv[0]['invoice_number'].split('-')
-                seq = int(parts[-1]) + 1
-            except: seq = 1
-        inv_num = f"INV-{year}-{seq:03d}"
-
-    # 3. Calculations
-    subtotal = sum(item.amount for item in data.line_items)
-    tax_total = sum(item.tax_amount for item in data.line_items)
-    
-    discount_amt = 0
-    if data.discount_type == "percentage":
-        discount_amt = subtotal * (data.discount_value / 100)
-    elif data.discount_type == "fixed":
-        discount_amt = data.discount_value
-        
-    total = subtotal - discount_amt + tax_total
-    
-    # 4. Create Object
+    # 3. Create Entity
     invoice = Invoice(
         user_id=current_user.id,
         client_id=data.client_id,
-        account_id=data.account_id,
         invoice_number=inv_num,
-        date=normalize_date(data.date),
-        due_date=normalize_date(data.due_date),
-        line_items=data.line_items,
-        subtotal=subtotal,
-        discount_amount=discount_amt,
-        tax_amount=tax_total,
-        total=total,
-        balance_due=total,
+        invoice_date=data.invoice_date,
+        due_date=data.due_date,
+        place_of_supply=data.place_of_supply,
+        billing_address=data.billing_address,
+        shipping_address=data.shipping_address,
+        gstin_customer=data.gstin_customer,
+        items=data.items,
+        hsn_summary=data.hsn_summary,
+        subtotal=data.subtotal,
+        total_tax=data.total_tax,
+        cgst_total=data.cgst_total,
+        sgst_total=data.sgst_total,
+        igst_total=data.igst_total,
+        round_off=data.round_off,
+        grand_total=data.grand_total,
+        grand_total_words=data.grand_total_words,
+        status=data.status,
         notes=data.notes,
         terms=data.terms,
-        tax_type=data.tax_type,
         currency=data.currency
     )
 
     inv_dict = invoice.model_dump()
     inv_dict['created_at'] = inv_dict['created_at'].isoformat()
+    inv_dict['updated_at'] = inv_dict['updated_at'].isoformat()
     await db.invoices.insert_one(inv_dict)
     
     await log_action(current_user.id, "create", "invoice", f"Created invoice {invoice.invoice_number} for {total}", invoice.id)

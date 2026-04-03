@@ -21,6 +21,7 @@ import AddTransactions from '@/pages/AddTransactions';
 import Transactions from '@/pages/Transactions';
 import Reports from '@/pages/Reports';
 import Categories from '@/pages/Categories';
+import Items from '@/pages/Items';
 import Accounts from '@/pages/Accounts';
 import Clients from '@/pages/Clients';
 import Settings from '@/pages/Settings';
@@ -96,6 +97,7 @@ const router = createBrowserRouter([
           { path: "/transactions", element: <FeatureGuard feature="transactions"><Transactions /></FeatureGuard> },
           { path: "/reports", element: <FeatureGuard feature="reports"><Reports /></FeatureGuard> },
           { path: "/categories", element: <Categories /> },
+          { path: "/items", element: <FeatureGuard feature="invoices"><Items /></FeatureGuard> },
           { path: "/accounts", element: <FeatureGuard feature="accounts"><Accounts /></FeatureGuard> },
           { path: "/clients", element: <FeatureGuard feature="clients"><Clients /></FeatureGuard> },
           { path: "/settings", element: <FeatureGuard feature="settings"><Settings /></FeatureGuard> },

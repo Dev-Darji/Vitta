@@ -36,8 +36,18 @@ const Clients = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const [newClient, setNewClient] = useState({
-    name: '', business_type: '', currency: 'INR', country: 'India', notes: ''
+    name: '', business_type: '', gstin: '', address: '', state: '', currency: 'INR', country: 'India', notes: ''
   });
+
+  const indianStates = [
+    "Jammu & Kashmir", "Himachal Pradesh", "Punjab", "Chandigarh", "Uttarakhand", "Haryana", 
+    "Delhi", "Rajasthan", "Uttar Pradesh", "Bihar", "Sikkim", "Arunachal Pradesh", 
+    "Nagaland", "Manipur", "Mizoram", "Tripura", "Meghalaya", "Assam", 
+    "West Bengal", "Jharkhand", "Odisha", "Chhattisgarh", "Madhya Pradesh", "Gujarat", 
+    "Daman & Diu", "Dadra & Nagar Haveli", "Maharashtra", "Andhra Pradesh (Old)", 
+    "Karnataka", "Goa", "Lakshadweep", "Kerala", "Tamil Nadu", "Puducherry", 
+    "Andaman & Nicobar", "Telangana", "Andhra Pradesh", "Ladakh"
+  ];
 
   const location = useLocation();
 
@@ -62,7 +72,7 @@ const Clients = () => {
       await api.post('/clients', newClient);
       toast.success('Client added');
       setIsAddOpen(false);
-      setNewClient({ name: '', business_type: '', currency: 'INR', country: 'India', notes: '' });
+      setNewClient({ name: '', business_type: '', gstin: '', address: '', state: '', currency: 'INR', country: 'India', notes: '' });
       fetchClients();
     } catch { toast.error('Failed to add client'); }
     finally { setSubmitting(false); }
@@ -117,6 +127,15 @@ const Clients = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <FieldLabel>GSTIN (Optional)</FieldLabel>
+                  <Input
+                    placeholder="22AAAAA0000A1Z5"
+                    value={newClient.gstin}
+                    onChange={e => setNewClient(prev => ({ ...prev, gstin: e.target.value.toUpperCase() }))}
+                    className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-bold uppercase"
+                  />
+                </div>
+                <div>
                   <FieldLabel>Business Type</FieldLabel>
                   <Input
                     placeholder="e.g. Retail"
@@ -124,6 +143,22 @@ const Clients = () => {
                     onChange={e => setNewClient(prev => ({ ...prev, business_type: e.target.value }))}
                     className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <FieldLabel>State (Place of Supply)</FieldLabel>
+                  <Select value={newClient.state} onValueChange={v => setNewClient(prev => ({ ...prev, state: v }))}>
+                    <SelectTrigger className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium">
+                      <SelectValue placeholder="Select State" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {indianStates.map(s => (
+                        <SelectItem key={s} value={s} className="text-xs font-bold">{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <FieldLabel>Currency</FieldLabel>
@@ -138,6 +173,16 @@ const Clients = () => {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div>
+                <FieldLabel>Full Address</FieldLabel>
+                <Input
+                  placeholder="Building, Street, Area..."
+                  value={newClient.address}
+                  onChange={e => setNewClient(prev => ({ ...prev, address: e.target.value }))}
+                  className="h-10 rounded-lg border-slate-200 bg-slate-50 text-[13px] font-medium"
+                />
               </div>
 
               <div>
@@ -222,9 +267,16 @@ const Clients = () => {
                     {/* Name + type */}
                     <div className="mb-4">
                       <h3 className="text-[14.5px] font-semibold text-slate-900 leading-tight mb-1.5 truncate">{client.name}</h3>
-                      <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10.5px] font-medium">
-                        {client.business_type || 'Private Entity'}
-                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10.5px] font-medium">
+                          {client.business_type || 'Private Entity'}
+                        </span>
+                        {client.gstin && (
+                          <span className="inline-block px-2 py-0.5 rounded-md bg-blue-50 border border-blue-100 text-blue-700 text-[10.5px] font-black uppercase tracking-tighter">
+                            GST: {client.gstin}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Stats row */}
