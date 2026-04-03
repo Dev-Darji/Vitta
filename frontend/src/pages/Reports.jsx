@@ -26,6 +26,10 @@ const Reports = () => {
     const [loading, setLoading] = useState(true);
     const [pnlData, setPnlData] = useState(null);
     const [bsData, setBsData] = useState(null);
+    const [gstData, setGstData] = useState(null);
+    const [gstMonth, setGstMonth] = useState(new Date().getMonth() + 1);
+    const [gstYear, setGstYear] = useState(new Date().getFullYear());
+    const [gstLoading, setGstLoading] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -54,6 +58,120 @@ const Reports = () => {
             <span className={`text-[13px] tabular-nums ${isTotal ? 'font-black text-slate-900' : 'font-bold text-slate-600'}`}>
                 ₹{value?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </span>
+        </div>
+    );
+
+    const fetchGst = async (m, y) => {
+        setGstLoading(true);
+        try {
+            const res = await api.get('/reports/gst-summary', { params: { month: m, year: y } });
+            setGstData(res.data);
+        } catch (e) {
+            toast.error("GST Compliance fetch failed");
+        } finally {
+            setGstLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'gst') fetchGst(gstMonth, gstYear);
+    }, [activeTab, gstMonth, gstYear]);
+
+    const GSTRDashboard = () => (
+        <div className="space-y-6">
+            <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 bg-indigo-50 rounded-xl flex items-center justify-center">
+                        <ShieldCheck className="h-5 w-5 text-indigo-500" />
+                    </div>
+                    <div>
+                        <h3 className="text-sm font-black text-slate-900 uppercase">GSTR Audit Engine</h3>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Compliance Period Control</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <select 
+                        value={gstMonth} 
+                        onChange={(e) => setGstMonth(parseInt(e.target.value))}
+                        className="h-9 rounded-xl border-slate-200 bg-slate-50 text-[11px] font-bold px-4 focus:ring-2 ring-primary/10 transition-all outline-none"
+                    >
+                        {Array.from({length: 12}, (_, i) => (
+                            <option key={i+1} value={i+1}>{new Date(2000, i).toLocaleString('default', { month: 'long' })}</option>
+                        ))}
+                    </select>
+                    <select 
+                        value={gstYear} 
+                        onChange={(e) => setGstYear(parseInt(e.target.value))}
+                        className="h-9 rounded-xl border-slate-200 bg-slate-50 text-[11px] font-bold px-4 focus:ring-2 ring-primary/10 transition-all outline-none"
+                    >
+                        {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                    <Button 
+                        size="sm" 
+                        onClick={() => fetchGst(gstMonth, gstYear)}
+                        disabled={gstLoading}
+                        className="bg-slate-900 text-white rounded-xl h-9 px-6 text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-200"
+                    >
+                        {gstLoading ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Download className="h-3 w-3 mr-2" />}
+                        Sync
+                    </Button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* GSTR-1 (Outward Supply) */}
+                <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm relative overflow-hidden group">
+                    <div className="absolute -right-4 -top-4 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity">
+                        <TrendingUp className="h-32 w-32" />
+                    </div>
+                    <h2 className="text-sm font-black text-slate-900 uppercase mb-8 flex items-center gap-2">
+                         GSTR-1 Outward Supply
+                    </h2>
+                    <div className="space-y-1 relative z-10">
+                        <ScheduleIIIRow label="Total Taxable Value" value={gstData?.total_taxable_sales} isSub />
+                        <ScheduleIIIRow label="Central Tax (CGST)" value={gstData?.total_output_gst / 2} isSub />
+                        <ScheduleIIIRow label="State Tax (SGST)" value={gstData?.total_output_gst / 2} isSub />
+                        <ScheduleIIIRow label="Total Output GST" value={gstData?.total_output_gst} isTotal />
+                    </div>
+                </div>
+
+                {/* GSTR-3B (Input Tax Credit) */}
+                <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm relative overflow-hidden group">
+                    <div className="absolute -right-4 -top-4 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity">
+                        <TrendingDown className="h-32 w-32" />
+                    </div>
+                    <h2 className="text-sm font-black text-slate-900 uppercase mb-8 flex items-center gap-2">
+                        GSTR-3B Input Tax Credit
+                    </h2>
+                    <div className="space-y-1 relative z-10">
+                        <ScheduleIIIRow label="Eligible ITC (B2B)" value={gstData?.total_itc} isSub />
+                        <ScheduleIIIRow label="Other Inward Supplies" value={0} isSub />
+                        <ScheduleIIIRow label="Total ITC Available" value={gstData?.total_itc} isTotal />
+                    </div>
+                </div>
+            </div>
+
+            {/* Net Tax Liability */}
+            <div className="bg-slate-950 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] -mr-32 -mt-32" />
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                    <div>
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="h-2 w-2 bg-indigo-400 rounded-full animate-pulse" />
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">Compliance Net Forecast</p>
+                        </div>
+                        <h2 className="text-2xl font-black tracking-tight">Net GST Payable</h2>
+                        <p className="text-slate-400 text-xs font-semibold mt-1">Reflecting offset of {((gstData?.total_itc / gstData?.total_output_gst) * 100).toFixed(0)}% via ITC</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Total Amount Due</p>
+                        <p className="text-4xl font-black tracking-tighter">
+                            <span className="text-lg text-slate-600 mr-2 font-bold">₹</span>
+                            {(Math.max(0, (gstData?.total_output_gst || 0) - (gstData?.total_itc || 0))).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 
@@ -193,18 +311,9 @@ const Reports = () => {
                     )}
                 </TabsContent>
 
-                {/* 3. GST Summary (Placeholder for detailed compliance) */}
+                {/* 3. GST Summary (Active Compliance Dashboard) */}
                 <TabsContent value="gst" className="mt-0 focus-visible:outline-none">
-                    <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
-                         <div className="text-center py-12">
-                            <ShieldCheck className="h-12 w-12 text-primary/20 mx-auto mb-4" />
-                            <h3 className="text-lg font-black text-slate-900 uppercase">GST Auditor</h3>
-                            <p className="text-xs text-slate-400 font-medium max-w-sm mx-auto mb-8 leading-relaxed">
-                                Our real-time engine compares your GSTR-1 Sales with Input Tax Credits found in your ledgers.
-                            </p>
-                            <Button className="h-10 px-8 bg-slate-900 text-white rounded-xl font-bold text-xs">Run GST Compliance Audit</Button>
-                         </div>
-                    </div>
+                    <GSTRDashboard />
                 </TabsContent>
             </Tabs>
         </div>

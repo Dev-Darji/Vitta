@@ -230,7 +230,7 @@ class BankAccount(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
-    client_id: str
+    client_id: Optional[str] = None
     account_name: str
     account_type: str
     bank_name: Optional[str] = None
@@ -464,13 +464,21 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
         "status": {"$in": ["sent", "overdue"]}
     }).sort("due_date", 1).limit(5).to_list(5)
     
+    for inv in outstanding_invoices:
+        inv.pop('_id', None)
+        client = await db.clients.find_one({"id": inv.get('client_id')}, {"name": 1, "_id": 0})
+        inv['client_name'] = client['name'] if client else 'Unknown'
+        
+    txn_count = await db.transactions.count_documents({"user_id": current_user.id})
+    
     return {
         "revenue_month": month_revenue,
         "receivable_total": total_receivable,
         "expense_month": month_expenses,
         "cash_total": total_cash,
         "recent_activity": recent_logs,
-        "outstanding_list": outstanding_invoices
+        "outstanding_list": outstanding_invoices,
+        "transaction_count": txn_count
     }
 
 # ==================== CLIENT RESOURCE ROUTES ====================
@@ -1292,7 +1300,72 @@ async def import_items(
 
 # ==================== BANK ACCOUNT ROUTES ====================
 
-@api_router.post("/accounts", response_model=BankAccount)
+@api_router.post("/accounts/import")
+async def import_accounts(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
+        raise HTTPException(status_code=400, detail="Only Excel and CSV files are supported")
+    
+    try:
+        contents = await file.read()
+        if file.filename.lower().endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(contents))
+        else:
+            df = pd.read_excel(io.BytesIO(contents))
+        
+        df.columns = [str(c).strip().lower() for c in df.columns]
+        
+        col_map = {
+            'account_name': ['account', 'account name', 'bank name', 'ledger'],
+            'account_type': ['type', 'kind', 'account type'],
+            'opening_balance': ['balance', 'opening balance', 'amount', 'opening'],
+            'bank_name': ['bank', 'institution']
+        }
+        
+        accounts_to_create = []
+        for _, row in df.iterrows():
+            acc_data = {
+                "id": str(uuid.uuid4()),
+                "user_id": current_user.id,
+                "client_id": None,
+                "account_name": "",
+                "account_type": "Bank",
+                "bank_name": "",
+                "account_number": "",
+                "balance": 0.0,
+                "opening_balance": 0.0,
+                "opening_balance_date": datetime.now().strftime("%d-%m-%Y"),
+                "currency": "INR",
+                "notes": "Imported via CSV/Excel",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            for field, aliases in col_map.items():
+                for alias in aliases:
+                    if alias in df.columns:
+                        val = row[alias]
+                        if pd.notna(val) and val != '':
+                            if field in ['balance', 'opening_balance']:
+                                try: acc_data[field] = float(str(val).replace(',',''))
+                                except: pass
+                            else:
+                                acc_data[field] = str(val).strip()
+                            break
+            
+            if acc_data['account_name']:
+                accounts_to_create.append(acc_data)
+        
+        if accounts_to_create:
+            await db.accounts.insert_many(accounts_to_create)
+            await log_action(current_user.id, "import", "accounts", f"Imported {len(accounts_to_create)} accounts from {file.filename}")
+            return {"message": f"Successfully imported {len(accounts_to_create)} accounts"}
+        return {"message": "No valid accounts found"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+
+@api_router.put("/accounts/{account_id}", response_model=BankAccount)
 async def create_account(account_data: BankAccountCreate, current_user: User = Depends(get_current_user)):
     # Verify client belongs to user if provided
     if account_data.client_id:
@@ -1617,6 +1690,69 @@ async def update_client(client_id: str, data: dict, current_user: User = Depends
     updated = await db.clients.find_one({"id": client_id}, {"_id": 0})
     return updated
 
+@api_router.post("/clients/import")
+async def import_clients(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
+        raise HTTPException(status_code=400, detail="Only Excel and CSV files are supported")
+    
+    try:
+        contents = await file.read()
+        if file.filename.lower().endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(contents))
+        else:
+            df = pd.read_excel(io.BytesIO(contents))
+        
+        df.columns = [str(c).strip().lower() for c in df.columns]
+        
+        col_map = {
+            'name': ['client name', 'name', 'business name', 'customer', 'customer name', 'party'],
+            'gstin': ['gstin', 'gst', 'gst number', 'gst/tin', 'identity'],
+            'business_type': ['type', 'business type', 'category', 'kind'],
+            'address': ['address', 'billing address', 'office address', 'location'],
+            'state': ['state', 'province', 'region'],
+            'email': ['email', 'email address', 'contact email'],
+            'phone': ['phone', 'mobile', 'contact', 'tele']
+        }
+        
+        clients_to_create = []
+        for _, row in df.iterrows():
+            client_data = {
+                "id": str(uuid.uuid4()),
+                "user_id": current_user.id,
+                "name": "",
+                "business_type": "Individual",
+                "gstin": "",
+                "address": "",
+                "state": "Gujarat",
+                "currency": "INR",
+                "country": "India",
+                "notes": "Imported via CSV/Excel",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            for field, aliases in col_map.items():
+                for alias in aliases:
+                    if alias in df.columns:
+                        val = row[alias]
+                        if pd.notna(val) and val != '':
+                            client_data[field] = str(val).strip()
+                            if field == 'gstin': client_data[field] = client_data[field].upper()
+                            break
+            
+            if client_data['name']:
+                clients_to_create.append(client_data)
+        
+        if clients_to_create:
+            await db.clients.insert_many(clients_to_create)
+            await log_action(current_user.id, "import", "clients", f"Imported {len(clients_to_create)} clients from {file.filename}")
+            return {"message": f"Successfully imported {len(clients_to_create)} clients"}
+        return {"message": "No valid clients found"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+
 @api_router.delete("/clients/{client_id}")
 async def delete_client(client_id: str, current_user: User = Depends(get_current_user)):
     client = await db.clients.find_one({"id": client_id, "user_id": current_user.id})
@@ -1730,7 +1866,7 @@ async def create_category(category_data: CategoryCreate, current_user: User = De
     
     await db.categories.insert_one(category_dict)
     
-    await log_action(current_user.id, "create", "category", f"Created group: {category.name}", category.id)
+    await log_action(current_user.id, "create", "category", f"Created category: {category.name}", category.id)
     return category
 
 @api_router.get("/categories", response_model=List[Category])
@@ -1762,10 +1898,10 @@ async def update_category(category_id: str, data: dict, current_user: User = Dep
 async def delete_category(category_id: str, current_user: User = Depends(get_current_user)):
     result = await db.categories.delete_one({"id": category_id, "user_id": current_user.id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Group not found")
+        raise HTTPException(status_code=404, detail="Category not found")
     
-    await log_action(current_user.id, "delete", "category", f"Deleted group ID: {category_id}", category_id)
-    return {"message": "Group deleted successfully"}
+    await log_action(current_user.id, "delete", "category", f"Deleted category ID: {category_id}", category_id)
+    return {"message": "Category deleted successfully"}
 
 # ==================== TRANSACTION ROUTES ====================
 
@@ -3111,10 +3247,10 @@ async def get_gst_summary(month: int, year: int, current_user: User = Depends(ge
     total_output_gst = 0
     
     for inv in invoices:
-        tax_amt = inv.get('tax_amount', 0)
+        tax_amt = inv.get('total_tax', 0)
         total_output_gst += tax_amt
-        # Taxable value = total - tax
-        total_taxable_sales += (inv.get('total_amount', 0) - tax_amt)
+        # Taxable value = subtotal
+        total_taxable_sales += inv.get('subtotal', 0)
         
     # 2. Calculate Input Tax Credit (ITC - Expenses)
     # Filter for 'Expense' categories for better accuracy if possible

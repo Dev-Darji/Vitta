@@ -33,11 +33,11 @@ const menuItemsRaw = [
   { path: '/accounts',     icon: Wallet,           label: 'Accounts',         testId: 'menu-accounts',  feature: 'accounts' },
   { path: '/transactions', icon: CreditCard,       label: 'Transactions',     testId: 'menu-transactions', feature: 'transactions' },
   { path: '/invoices',     icon: FileText,         label: 'Invoices',         testId: 'menu-invoices',     feature: 'invoices' },
-  { path: '/items',        icon: ShoppingBag,      label: 'Items & SAC',      testId: 'menu-items',        feature: 'invoices' },
+  { path: '/items',        icon: ShoppingBag,      label: 'Items and SAC',      testId: 'menu-items',        feature: 'invoices' },
   { path: '/reports',      icon: BarChart3,        label: 'Reports',          testId: 'menu-reports',      feature: 'reports' },
   { path: '/categories',   icon: Tag,              label: 'Categories',       testId: 'menu-categories',   feature: 'settings' },
   { path: '/automation',   icon: Zap,              label: 'Automation',       testId: 'menu-automation',   feature: 'automation' },
-  { path: '/audit',        icon: History,          label: 'Audit Trail',      testId: 'menu-audit',        feature: 'audit_trail' },
+  { path: '/audit',        icon: History,          label: 'Audit Trials',      testId: 'menu-audit',        feature: 'audit_trail' },
   { path: '/settings',     icon: Settings,         label: 'Settings',         testId: 'menu-settings',     feature: 'settings' },
 ];
 

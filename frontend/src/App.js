@@ -107,8 +107,8 @@ const router = createBrowserRouter([
           { path: "/invoices/:id/edit", element: <FeatureGuard feature="invoices"><CreateInvoice /></FeatureGuard> },
           { path: "/audit", element: <FeatureGuard feature="audit_trail"><AuditLogs /></FeatureGuard> },
           { path: "/automation", element: <FeatureGuard feature="automation"><AutomationRules /></FeatureGuard> },
-          { path: "/devmode", element: <DevMode /> },
-        ]
+          process.env.NODE_ENV === 'development' && { path: "/devmode", element: <DevMode /> },
+        ].filter(Boolean)
       }
     ]
   }
