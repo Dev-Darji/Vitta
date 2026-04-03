@@ -126,6 +126,9 @@ app.add_middleware(
 
 api_router = APIRouter(prefix="/api")
 
+@api_router.get("/health")
+async def health_check():
+    return {"status": "healthy", "environment": "production" if "render" in str(os.environ.get("HOSTNAME", "")) else "local"}
 
 @app.get("/")
 async def root():
@@ -149,41 +152,6 @@ class User(BaseModel):
     email: EmailStr
     business_name: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-# ==================== AUTH HELPERS ====================
-
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-def create_access_token(data: dict):
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    token = credentials.credentials
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
-    if user is None:
-        raise AuthError("User associated with this session no longer exists.")
-    
-    if isinstance(user.get('created_at'), str):
-        user['created_at'] = datetime.fromisoformat(user['created_at'])
-    
-    return User(**user)
-
 
 class ClientCreate(BaseModel):
     name: str
@@ -582,111 +550,39 @@ class Item(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# ==================== AUTH HELPERS ====================
 
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
 
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
-@api_router.post("/dev/seed-data")
-async def seed_data(current_user: User = Depends(get_current_user)):
-    """
-    Generates 6 months of realistic business data for the current user.
-    """
-    # 1. Create a Primary Bank Account
-    account_id = str(uuid.uuid4())
-    account = {
-        "id": account_id,
-        "user_id": current_user.id,
-        "client_id": "SELF",
-        "account_name": "HDFC Business Prime",
-        "account_type": "Bank",
-        "bank_name": "HDFC Bank",
-        "account_number": "501004239841",
-        "balance": 0.0,
-        "opening_balance": 50000.0,
-        "opening_balance_date": "01-10-2025",
-        "currency": "INR",
-        "notes": "Primary operations account",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.accounts.insert_one(account)
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
     
-    # 2. Create Clients
-    clients = [
-        {"id": str(uuid.uuid4()), "name": "Google India Pvt Ltd", "business_type": "Corporate", "gstin": "07AAAAA0000A1Z5", "state": "Delhi"},
-        {"id": str(uuid.uuid4()), "name": "Zomato Limited", "business_type": "Enterprise", "gstin": "24BBBBB1111B2Z6", "state": "Gujarat"},
-        {"id": str(uuid.uuid4()), "name": "Rajesh Exports", "business_type": "Proprietorship", "gstin": None, "state": "Maharashtra"}
-    ]
-    for c in clients:
-        c.update({"user_id": current_user.id, "currency": "INR", "country": "India", "created_at": datetime.now(timezone.utc).isoformat()})
-        await db.clients.insert_one(c)
-
-    # 3. Create Categories (Groups)
-    cats = [
-        {"id": "SALES-001", "name": "Software Consulting", "type": "income", "color": "#10b981", "schedule_iii_head": "Revenue from Operations"},
-        {"id": "RENT-001", "name": "Office Rent", "type": "expense", "color": "#ef4444", "schedule_iii_head": "Other Expenses"},
-        {"id": "AWS-001", "name": "Cloud Services", "type": "expense", "color": "#f59e0b", "schedule_iii_head": "Other Expenses"},
-        {"id": "SALARY-001", "name": "Staff Salary", "type": "expense", "color": "#3b82f6", "schedule_iii_head": "Employee Benefits"}
-    ]
-    for cat in cats:
-        cat.update({"user_id": current_user.id, "created_at": datetime.now(timezone.utc).isoformat()})
-        await db.categories.insert_one(cat)
-
-    # 4. Generate 6 Months of Transactions & Invoices (Oct 2025 - Mar 2026)
-    import random
-    from datetime import date
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    if user is None:
+        raise AuthError("User associated with this session no longer exists.")
     
-    total_balance = 50000.0
-    transactions = []
+    if isinstance(user.get('created_at'), str):
+        user['created_at'] = datetime.fromisoformat(user['created_at'])
     
-    # Opening Balance Transaction
-    transactions.append({
-        "id": str(uuid.uuid4()), "user_id": current_user.id, "account_id": account_id,
-        "date": "01-10-2025", "description": "Opening Balance", "amount": 50000.0,
-        "type": "opening", "created_at": datetime.now(timezone.utc).isoformat()
-    })
-
-    for m in range(10, 16): # Oct (10) to Mar (15 -> 3 next year)
-        year = 2025 if m <= 12 else 2026
-        month = m if m <= 12 else m - 12
-        
-        # Monthly Income (Sales)
-        income_amt = 150000 + random.randint(-10000, 30000)
-        transactions.append({
-            "id": str(uuid.uuid4()), "user_id": current_user.id, "account_id": account_id,
-            "date": f"05-{month:02d}-{year}", "description": f"Service Fee - {clients[0]['name']}",
-            "amount": income_amt, "type": "credit", "category_id": "SALES-001", 
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
-        total_balance += income_amt
-        
-        # Monthly Rent
-        transactions.append({
-            "id": str(uuid.uuid4()), "user_id": current_user.id, "account_id": account_id,
-            "date": f"01-{month:02d}-{year}", "description": "Monthly Office Rent", 
-            "amount": 35000.0, "type": "debit", "category_id": "RENT-001",
-            "created_at": datetime.now(timezone.utc).isoformat()
-        })
-        total_balance -= 35000.0
-        
-        # Weekly Expenses
-        for d in [7, 14, 21, 28]:
-            amt = random.randint(500, 3000)
-            transactions.append({
-                "id": str(uuid.uuid4()), "user_id": current_user.id, "account_id": account_id,
-                "date": f"{d:02d}-{month:02d}-{year}", "description": "Swiggy / Dinout Exp", 
-                "amount": float(amt), "type": "debit", "category_id": None,
-                "created_at": datetime.now(timezone.utc).isoformat()
-            })
-            total_balance -= amt
-
-    await db.transactions.insert_many(transactions)
-    await db.accounts.update_one({"id": account_id}, {"$set": {"balance": total_balance}})
-    
-    return {"status": "success", "message": "6 months of realistic financial history generated."}
-
-
-@api_router.get("/health")
-async def health_check():
-    return {"status": "healthy", "environment": "production" if "render" in str(os.environ.get("HOSTNAME", "")) else "local"}
+    return User(**user)
 
 
 # ==================== SCHEDULE III REPORTS ====================

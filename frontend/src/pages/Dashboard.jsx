@@ -115,20 +115,32 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [summaryRes, trendRes, accountsRes, breakdownRes, invoiceRes] = await Promise.all([
-        api.get('/reports/summary'),
-        api.get('/reports/monthly-trend'),
+      const [statsRes, accountsRes, trendRes] = await Promise.all([
+        api.get('/dashboard/stats'),
         api.get('/accounts'),
-        api.get('/reports/category-breakdown'),
-        api.get('/invoices/summary'),
+        api.get('/reports/monthly-trend')
       ]);
-      setSummary(summaryRes.data);
-      setMonthlyTrend(trendRes.data);
+      
+      const s = statsRes.data;
+      setSummary({
+        total_income: s.revenue_month,
+        total_expense: s.expense_month,
+        net_balance: s.revenue_month - s.expense_month,
+        transaction_count: s.recent_activity.length
+      });
       setAccounts(accountsRes.data);
-      setCategoryBreakdown(breakdownRes.data);
-      setInvoiceSummary(invoiceRes.data);
-    } catch { toast.error('Failed to load dashboard data'); }
-    finally { setLoading(false); }
+      setMonthlyTrend(trendRes.data);
+      setInvoiceSummary({
+        total_invoiced: s.revenue_month + s.receivable_total,
+        total_paid: s.revenue_month,
+        total_outstanding: s.receivable_total,
+        total_overdue: s.outstanding_list.filter(i => i.status === 'overdue').reduce((acc, i) => acc + i.balance_due, 0)
+      });
+    } catch { 
+      toast.error('Failed to load real-world dashboard data'); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   if (loading) {

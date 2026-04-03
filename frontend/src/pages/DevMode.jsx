@@ -168,6 +168,47 @@ const DevMode = () => {
                     })}
                 </div>
 
+                {/* Maintenance Actions */}
+                <div className="mt-12 space-y-6">
+                    <div className="flex flex-col gap-1">
+                        <h3 className="text-white font-black text-xs uppercase tracking-[0.2em] italic">Maintenance_Protocols</h3>
+                        <div className="h-px bg-slate-900 w-24" />
+                    </div>
+
+                    <Card className="bg-slate-900/20 border-slate-800/50 rounded-3xl overflow-hidden group hover:border-indigo-500/30 transition-all">
+                        <CardHeader className="pb-4">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 group-hover:scale-110 transition-transform">
+                                    <Zap className="h-6 w-6 text-indigo-400" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-sm font-black text-white uppercase tracking-tight">Generate Realistic Demo Data</CardTitle>
+                                    <CardDescription className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Populate account with 6-month financial history</CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-[11px] text-slate-400 leading-relaxed mb-6">
+                                This will create 3 realistic clients, 1 primary bank account, and 6 months of recurring transactions (Rent, Salary, Sales, Utilities). Perfect for stress-testing reports and visualizers.
+                            </p>
+                            <Button 
+                                onClick={async () => {
+                                    const id = toast.loading('Synchronizing temporal data streams...');
+                                    try {
+                                        await api.post('/dev/seed-data');
+                                        toast.success('Simulation Complete', { id, description: '6 months of data generated successfully.' });
+                                    } catch {
+                                        toast.error('Simulation Failed', { id });
+                                    }
+                                }}
+                                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[10px] uppercase tracking-widest h-11 rounded-xl shadow-lg shadow-indigo-500/10"
+                            >
+                                Trigger Seed Sequence
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+
                 <div className="mt-16 text-center">
                     <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.4em] flex items-center justify-center gap-2">
                         <Lock className="h-3 w-3" /> SECURED_RECOVERY_KEY_ENABLED

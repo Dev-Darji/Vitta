@@ -454,12 +454,110 @@ const InvoiceDetail = () => {
                         <Button variant="outline" className="h-10 rounded-xl px-6 font-bold text-xs">
                             <Send className="h-4 w-4 mr-2" /> Dispatch Receipt
                         </Button>
-                        <Button variant="outline" className="h-10 rounded-xl px-6 font-bold text-xs" onClick={() => navigate('/import')}>
-                            <Landmark className="h-4 w-4 mr-2" /> Sync Payment
-                        </Button>
+                        {invoice.status !== 'paid' && (
+                            <PaymentModal invoice={invoice} onPaid={(newStatus) => setInvoice({...invoice, status: newStatus})} />
+                        )}
                     </div>
                 </div>
             </div>
+        </div>
+    );
+};
+
+const PaymentModal = ({ invoice, onPaid }) => {
+    const [open, setOpen] = useState(false);
+    const [accounts, setAccounts] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [form, setForm] = useState({
+        amount: invoice.balance_due,
+        account_id: invoice.account_id || '',
+        payment_method: 'Bank Transfer'
+    });
+
+    useEffect(() => {
+        if (open) api.get('/accounts').then(res => {
+            setAccounts(res.data);
+            if (!form.account_id && res.data.length > 0) {
+                setForm(f => ({ ...f, account_id: res.data[0].id }));
+            }
+        });
+    }, [open]);
+
+    const handleRecord = async () => {
+        if (!form.account_id) return toast.error("Please select a bank account");
+        setLoading(true);
+        try {
+            const res = await api.post(`/invoices/${invoice.id}/record-payment`, form);
+            toast.success("Payment registered and ledger updated!");
+            onPaid(res.data.status_label);
+            setOpen(false);
+        } catch (e) {
+            toast.error("Accounting sync failed");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="inline-block">
+            <Button onClick={() => setOpen(true)} className="h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-6 font-bold text-xs shadow-lg shadow-emerald-200/50">
+                <CheckCircle className="h-4 w-4 mr-2" /> Record Receipt
+            </Button>
+
+            {open && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl space-y-6">
+                        <div className="space-y-1">
+                            <h3 className="text-xl font-black text-slate-900 tracking-tight">Record Payment</h3>
+                            <p className="text-[12px] text-slate-400 font-medium">This will update your ledger and bank balance instantly.</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount Received</label>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-300">₹</span>
+                                    <input 
+                                        type="number" 
+                                        value={form.amount} 
+                                        onChange={e => setForm({...form, amount: parseFloat(e.target.value)})}
+                                        className="w-full h-12 pl-8 pr-4 bg-slate-50 border border-slate-100 rounded-xl font-black text-slate-900 focus:outline-none focus:ring-2 ring-primary/20"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Payment Method</label>
+                                <select 
+                                    value={form.payment_method}
+                                    onChange={e => setForm({...form, payment_method: e.target.value})}
+                                    className="w-full h-12 px-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-900 focus:outline-none"
+                                >
+                                    {['Bank Transfer', 'Cash', 'UPI', 'Cheque', 'Credit Card'].map(m => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deposit To Account</label>
+                                <select 
+                                    value={form.account_id}
+                                    onChange={e => setForm({...form, account_id: e.target.value})}
+                                    className="w-full h-12 px-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-900 focus:outline-none"
+                                >
+                                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.account_name} (₹{acc.balance.toLocaleString()})</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 pt-4">
+                            <Button variant="ghost" onClick={() => setOpen(false)} className="flex-1 h-12 rounded-xl font-bold text-slate-500">Cancel</Button>
+                            <Button disabled={loading} onClick={handleRecord} className="flex-1 h-12 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest">
+                                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm Payment'}
+                            </Button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
         </div>
     );
 };
