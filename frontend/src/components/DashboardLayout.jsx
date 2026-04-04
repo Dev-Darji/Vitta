@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {  LayoutDashboard,  ArrowUpRight,  ArrowDownLeft,  Wallet,  TrendingUp,  Clock,  Plus,  Search,  MoreHorizontal, User, Users, Settings, CreditCard, FileText, Building2, PieChart as PieIcon, BarChart3, Receipt, PenLine, FileSpreadsheet, PlusCircle, Menu, LogOut, Upload, Tag, UserPlus, FileUp, Zap, History, ShoppingBag
 } from 'lucide-react';
@@ -49,6 +49,11 @@ const DashboardLayout = ({ children }) => {
   const location   = useLocation();
   const { isEnabled } = useUAC();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [companyProfile, setCompanyProfile] = useState(null);
+
+  useEffect(() => {
+    api.get('/company-profile').then(res => setCompanyProfile(res.data)).catch(() => {});
+  }, []);
 
   // Search state
   const [query, setQuery] = useState('');
@@ -138,6 +143,14 @@ const DashboardLayout = ({ children }) => {
             </span>
           </Link>
         </div>
+
+        {/* Company Info */}
+        {companyProfile?.company_name && (
+          <div className="px-5 py-2.5 border-b border-slate-100">
+            <p className="text-[13px] font-bold text-slate-900 truncate">{companyProfile.company_name}</p>
+            <p className="text-[10px] text-slate-400 font-medium truncate">{companyProfile.gstin || 'Setup in Settings'}</p>
+          </div>
+        )}
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">

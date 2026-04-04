@@ -1300,72 +1300,7 @@ async def import_items(
 
 # ==================== BANK ACCOUNT ROUTES ====================
 
-@api_router.post("/accounts/import")
-async def import_accounts(
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
-):
-    if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
-        raise HTTPException(status_code=400, detail="Only Excel and CSV files are supported")
-    
-    try:
-        contents = await file.read()
-        if file.filename.lower().endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(contents))
-        else:
-            df = pd.read_excel(io.BytesIO(contents))
-        
-        df.columns = [str(c).strip().lower() for c in df.columns]
-        
-        col_map = {
-            'account_name': ['account', 'account name', 'bank name', 'ledger'],
-            'account_type': ['type', 'kind', 'account type'],
-            'opening_balance': ['balance', 'opening balance', 'amount', 'opening'],
-            'bank_name': ['bank', 'institution']
-        }
-        
-        accounts_to_create = []
-        for _, row in df.iterrows():
-            acc_data = {
-                "id": str(uuid.uuid4()),
-                "user_id": current_user.id,
-                "client_id": None,
-                "account_name": "",
-                "account_type": "Bank",
-                "bank_name": "",
-                "account_number": "",
-                "balance": 0.0,
-                "opening_balance": 0.0,
-                "opening_balance_date": datetime.now().strftime("%d-%m-%Y"),
-                "currency": "INR",
-                "notes": "Imported via CSV/Excel",
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            
-            for field, aliases in col_map.items():
-                for alias in aliases:
-                    if alias in df.columns:
-                        val = row[alias]
-                        if pd.notna(val) and val != '':
-                            if field in ['balance', 'opening_balance']:
-                                try: acc_data[field] = float(str(val).replace(',',''))
-                                except: pass
-                            else:
-                                acc_data[field] = str(val).strip()
-                            break
-            
-            if acc_data['account_name']:
-                accounts_to_create.append(acc_data)
-        
-        if accounts_to_create:
-            await db.accounts.insert_many(accounts_to_create)
-            await log_action(current_user.id, "import", "accounts", f"Imported {len(accounts_to_create)} accounts from {file.filename}")
-            return {"message": f"Successfully imported {len(accounts_to_create)} accounts"}
-        return {"message": "No valid accounts found"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
-
-@api_router.put("/accounts/{account_id}", response_model=BankAccount)
+@api_router.post("/accounts", response_model=BankAccount)
 async def create_account(account_data: BankAccountCreate, current_user: User = Depends(get_current_user)):
     # Verify client belongs to user if provided
     if account_data.client_id:
@@ -1441,12 +1376,15 @@ async def get_accounts_summary(current_user: User = Depends(get_current_user)):
     
     for acc in accounts:
         acc_id = acc["id"]
-        acc["inflow"] = summary_map.get(acc_id, {}).get("inflow", 0.0)
-        acc["outflow"] = summary_map.get(acc_id, {}).get("outflow", 0.0)
-        
+        inflow = summary_map.get(acc_id, {}).get("inflow", 0.0)
+        outflow = summary_map.get(acc_id, {}).get("outflow", 0.0)
+        acc["inflow"] = inflow
+        acc["outflow"] = outflow
+        acc["balance"] = acc.get("opening_balance", 0) + inflow - outflow
+
         if isinstance(acc.get('created_at'), str):
             acc['created_at'] = datetime.fromisoformat(acc['created_at'])
-    
+
     return {"accounts": accounts}
 
 @api_router.delete("/accounts/{account_id}")
@@ -1689,69 +1627,6 @@ async def update_client(client_id: str, data: dict, current_user: User = Depends
     
     updated = await db.clients.find_one({"id": client_id}, {"_id": 0})
     return updated
-
-@api_router.post("/clients/import")
-async def import_clients(
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
-):
-    if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
-        raise HTTPException(status_code=400, detail="Only Excel and CSV files are supported")
-    
-    try:
-        contents = await file.read()
-        if file.filename.lower().endswith('.csv'):
-            df = pd.read_csv(io.BytesIO(contents))
-        else:
-            df = pd.read_excel(io.BytesIO(contents))
-        
-        df.columns = [str(c).strip().lower() for c in df.columns]
-        
-        col_map = {
-            'name': ['client name', 'name', 'business name', 'customer', 'customer name', 'party'],
-            'gstin': ['gstin', 'gst', 'gst number', 'gst/tin', 'identity'],
-            'business_type': ['type', 'business type', 'category', 'kind'],
-            'address': ['address', 'billing address', 'office address', 'location'],
-            'state': ['state', 'province', 'region'],
-            'email': ['email', 'email address', 'contact email'],
-            'phone': ['phone', 'mobile', 'contact', 'tele']
-        }
-        
-        clients_to_create = []
-        for _, row in df.iterrows():
-            client_data = {
-                "id": str(uuid.uuid4()),
-                "user_id": current_user.id,
-                "name": "",
-                "business_type": "Individual",
-                "gstin": "",
-                "address": "",
-                "state": "Gujarat",
-                "currency": "INR",
-                "country": "India",
-                "notes": "Imported via CSV/Excel",
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            
-            for field, aliases in col_map.items():
-                for alias in aliases:
-                    if alias in df.columns:
-                        val = row[alias]
-                        if pd.notna(val) and val != '':
-                            client_data[field] = str(val).strip()
-                            if field == 'gstin': client_data[field] = client_data[field].upper()
-                            break
-            
-            if client_data['name']:
-                clients_to_create.append(client_data)
-        
-        if clients_to_create:
-            await db.clients.insert_many(clients_to_create)
-            await log_action(current_user.id, "import", "clients", f"Imported {len(clients_to_create)} clients from {file.filename}")
-            return {"message": f"Successfully imported {len(clients_to_create)} clients"}
-        return {"message": "No valid clients found"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
 
 @api_router.delete("/clients/{client_id}")
 async def delete_client(client_id: str, current_user: User = Depends(get_current_user)):

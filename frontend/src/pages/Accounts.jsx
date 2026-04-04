@@ -165,10 +165,6 @@ const AccountCard = ({ account, cfg, Icon, index, getClientName, onEdit, onDelet
             <p className="text-[18px] font-bold text-slate-900 leading-tight">
               {sym}{account.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
-            <div className="flex items-center justify-end gap-1 mt-1">
-              <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              <span className="text-[10px] font-semibold text-emerald-500 tracking-wide">Active</span>
-            </div>
           </div>
         </div>
 
@@ -314,7 +310,10 @@ const Accounts = () => {
         api.get('/accounts/summary'),
         api.get('/clients')
       ]);
-      setAccounts(accRes.data.accounts);
+      setAccounts(accRes.data.accounts.map(acc => ({
+        ...acc,
+        balance: (acc.opening_balance || 0) + (acc.inflow || 0) - (acc.outflow || 0)
+      })));
       setClients(clRes.data);
       if (clRes.data.length > 0) setNewAccount(prev => ({ ...prev, client_id: clRes.data[0].id }));
     } catch { toast.error('Failed to load data'); }
