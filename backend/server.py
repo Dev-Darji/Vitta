@@ -2372,7 +2372,304 @@ async def get_invoice_summary(current_user: User = Depends(get_current_user)):
         "overdue_amount": overdue_amount
     }
 
+
+@api_router.post("/invoices/import")
+async def import_invoices(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    if not file.filename.lower().endswith(('.xlsx', '.xls', '.csv')):
+        raise HTTPException(status_code=400, detail="Only Excel and CSV files are supported")
+    
+    try:
+        contents = await file.read()
+        if file.filename.lower().endswith('.csv'):
+            try:
+                df = pd.read_csv(io.BytesIO(contents))
+            except:
+                try:
+                    df = pd.read_csv(io.BytesIO(contents), encoding='latin-1')
+                except:
+                    df = pd.read_csv(io.BytesIO(contents), encoding='cp1252')
+        else:
+            df = pd.read_excel(io.BytesIO(contents))
+        
+        # Normalize columns
+        df.columns = [str(c).strip().lower() for c in df.columns]
+        
+        # Fetch all clients to map names to IDs
+        all_clients = await db.clients.find({"user_id": current_user.id}).to_list(None)
+        client_map = {c['name'].lower(): str(c['id']) for c in all_clients}
+        
+        # Fuzzy column mapping
+        col_map = {
+            'invoice_number': ['invoice number', 'invoice no', 'bill no', 'number', 'id', 'inv no'],
+            'invoice_date': ['invoice date', 'date', 'bill date', 'issued date'],
+            'due_date': ['due date', 'expiry date', 'payment date'],
+            'client_name': ['client name', 'client', 'customer', 'customer name', 'billed to', 'entity'],
+            'place_of_supply': ['place of supply', 'pos', 'state', 'supply state'],
+            'billing_address': ['billing address', 'address', 'client address'],
+            'shipping_address': ['shipping address', 'shipping'],
+            'status': ['status', 'payment status', 'invoice status'],
+            'item_name': ['item name', 'item', 'description', 'particulars', 'product'],
+            'hsn_sac': ['hsn', 'sac', 'hsn/sac', 'code'],
+            'quantity': ['quantity', 'qty', 'units', 'count'],
+            'unit': ['unit', 'uom', 'measure'],
+            'rate': ['rate', 'price', 'unit price', 'amount/unit'],
+            'tax_rate': ['tax rate', 'gst rate', 'tax %', 'gst %', 'tax'],
+            'discount': ['discount', 'discount %', 'off %']
+        }
+        
+        # Pre-fetch company profile for tax logic
+        profile = await db.company_profiles.find_one({"user_id": current_user.id})
+        my_state = profile.get("state") if profile else "Gujarat" # Fallback if no profile
+        
+        invoice_id_col = None
+        for alias in col_map['invoice_number']:
+            if alias in df.columns:
+                invoice_id_col = alias
+                break
+                
+        if invoice_id_col:
+            # Group by invoice number for multi-item invoices
+            grouped = df.groupby(invoice_id_col)
+        else:
+            # Each row is a separate invoice
+            df['_row_idx'] = range(len(df))
+            grouped = df.groupby('_row_idx')
+            
+        invoices_to_create = []
+        
+        for name, group in grouped:
+            first_row = group.iloc[0]
+            
+            # Find Client ID
+            target_client_id = None
+            for alias in col_map['client_name']:
+                if alias in df.columns:
+                    val = str(first_row[alias]).strip().lower()
+                    if val in client_map:
+                        target_client_id = client_map[val]
+                        break
+            
+            # Skip if no client found and no defaults available
+            if not target_client_id:
+                if all_clients:
+                    target_client_id = str(all_clients[0]['id'])
+                else: 
+                    # If user has no clients, we can't create an invoice
+                    continue
+
+            # Basic metadata
+            inv_no = str(name) if invoice_id_col else "AUTO"
+            if inv_no == "AUTO" or inv_no == "nan" or not inv_no:
+                 inv_no = await generate_invoice_number(current_user.id)
+            
+            # Extract Date
+            inv_date = datetime.now().strftime("%d-%m-%Y")
+            for alias in col_map['invoice_date']:
+                if alias in df.columns:
+                    val = first_row[alias]
+                    if not pd.isna(val) and val != '':
+                         try:
+                             if isinstance(val, (datetime, pd.Timestamp)):
+                                 inv_date = val.strftime("%d-%m-%Y")
+                             else:
+                                 inv_date = pd.to_datetime(str(val)).strftime("%d-%m-%Y")
+                         except: pass
+                    break
+            
+            due_date = inv_date
+            for alias in col_map['due_date']:
+                if alias in df.columns:
+                    val = first_row[alias]
+                    if not pd.isna(val) and val != '':
+                         try:
+                             if isinstance(val, (datetime, pd.Timestamp)):
+                                 due_date = val.strftime("%d-%m-%Y")
+                             else:
+                                 due_date = pd.to_datetime(str(val)).strftime("%d-%m-%Y")
+                         except: pass
+                    break
+            
+            pos = my_state
+            for alias in col_map['place_of_supply']:
+                if alias in df.columns:
+                    val = first_row[alias]
+                    if not pd.isna(val):
+                        pos = str(val)
+                    break
+            
+            billing_address = "Imported Address"
+            for alias in col_map['billing_address']:
+                if alias in df.columns:
+                    val = first_row[alias]
+                    if not pd.isna(val):
+                        billing_address = str(val)
+                    break
+            
+            status = "draft"
+            for alias in col_map['status']:
+                if alias in df.columns:
+                    s_val = str(first_row[alias]).lower()
+                    if 'paid' in s_val: status = "paid"
+                    elif 'sent' in s_val: status = "sent"
+                    break
+            
+            # Create Items list for this invoice
+            invoice_items = []
+            for _, row in group.iterrows():
+                item_name = "Imported Item"
+                for alias in col_map['item_name']:
+                    if alias in df.columns:
+                        val = row[alias]
+                        if not pd.isna(val): item_name = str(val)
+                        break
+                
+                hsn = "9983" # Default SAC for services
+                for alias in col_map['hsn_sac']:
+                    if alias in df.columns:
+                        val = row[alias]
+                        if not pd.isna(val): hsn = str(val)
+                        break
+                
+                qty = 1.0
+                for alias in col_map['quantity']:
+                    if alias in df.columns:
+                        try: qty = float(row[alias])
+                        except: pass
+                        break
+                
+                rate = 0.0
+                for alias in col_map['rate']:
+                    if alias in df.columns:
+                        try: 
+                            r_val = str(row[alias]).replace('₹', '').replace(',', '').strip()
+                            rate = float(r_val)
+                        except: pass
+                        break
+                
+                tax_rate = 18.0
+                for alias in col_map['tax_rate']:
+                    if alias in df.columns:
+                        try: 
+                            t_val = str(row[alias]).replace('%', '').strip()
+                            tax_rate = float(t_val)
+                        except: pass
+                        break
+                
+                discount = 0.0
+                for alias in col_map['discount']:
+                    if alias in df.columns:
+                        try: discount = float(row[alias])
+                        except: pass
+                        break
+                
+                # Create Item
+                it_id = str(uuid.uuid4())
+                item_obj = InvoiceItem(
+                    item_id=it_id,
+                    name=item_name,
+                    hsn_sac=hsn,
+                    quantity=qty,
+                    unit="PCS",
+                    rate=rate,
+                    tax_rate=tax_rate,
+                    discount_percent=discount,
+                    taxable_value=0, 
+                    total_amount=0 
+                )
+                invoice_items.append(item_obj)
+            
+            # Tax Calculations
+            is_inter_state = pos != my_state
+            it_subtotal = 0
+            it_cgst = 0
+            it_sgst = 0
+            it_igst = 0
+            it_hsn_map = {}
+            
+            for it in invoice_items:
+                base = it.quantity * it.rate
+                it.taxable_value = base - (base * it.discount_percent / 100)
+                
+                if is_inter_state:
+                    it.igst_rate = it.tax_rate
+                    it.igst_amount = it.taxable_value * (it.igst_rate / 100)
+                    it.cgst_amount = it.sgst_amount = 0
+                else:
+                    it.cgst_rate = it.tax_rate / 2
+                    it.sgst_rate = it.tax_rate / 2
+                    it.cgst_amount = it.taxable_value * (it.cgst_rate / 100)
+                    it.sgst_amount = it.taxable_value * (it.sgst_rate / 100)
+                    it.igst_amount = 0
+                
+                it.total_amount = it.taxable_value + it.cgst_amount + it.sgst_amount + it.igst_amount
+                it_subtotal += it.taxable_value
+                it_cgst += it.cgst_amount
+                it_sgst += it.sgst_amount
+                it_igst += it.igst_amount
+                
+                # Group for HSN Summary
+                h = it.hsn_sac
+                if h not in it_hsn_map:
+                    it_hsn_map[h] = {"taxable": 0, "tax": 0, "rate": it.tax_rate}
+                it_hsn_map[h]["taxable"] += it.taxable_value
+                it_hsn_map[h]["tax"] += (it.cgst_amount + it.sgst_amount + it.igst_amount)
+
+            hsn_summary = [
+                HSNSummary(
+                    hsn_sac=h, 
+                    taxable_value=v["taxable"], 
+                    tax_rate=v["rate"],
+                    total_tax=v["tax"]
+                ) for h, v in it_hsn_map.items()
+            ]
+            
+            total_tax = it_cgst + it_sgst + it_igst
+            grand_total = round(it_subtotal + total_tax)
+            round_off = grand_total - (it_subtotal + total_tax)
+            
+            invoice_doc = {
+                "id": str(uuid.uuid4()),
+                "user_id": current_user.id,
+                "client_id": target_client_id,
+                "invoice_number": inv_no,
+                "invoice_type": "Tax Invoice",
+                "invoice_date": inv_date,
+                "due_date": due_date,
+                "place_of_supply": pos,
+                "billing_address": billing_address,
+                "items": [it.model_dump() for it in invoice_items],
+                "hsn_summary": [h.model_dump() for h in hsn_summary],
+                "subtotal": it_subtotal,
+                "total_tax": total_tax,
+                "cgst_total": it_cgst,
+                "sgst_total": it_sgst,
+                "igst_total": it_igst,
+                "round_off": round_off,
+                "grand_total": grand_total,
+                "grand_total_words": amount_to_words(grand_total),
+                "status": status,
+                "amount_paid": float(grand_total) if status == "paid" else 0.0,
+                "balance_due": 0.0 if status == "paid" else float(grand_total),
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            invoices_to_create.append(invoice_doc)
+            
+        if invoices_to_create:
+            await db.invoices.insert_many(invoices_to_create)
+            await log_action(current_user.id, "import", "invoice", f"Bulk imported {len(invoices_to_create)} invoices")
+            return {"message": f"Successfully imported {len(invoices_to_create)} invoices"}
+        else:
+            return {"message": "No valid invoice rows found or client matching failed."}
+            
+    except Exception as e:
+        logger.error(f"Invoice Import Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+
 @api_router.get("/invoices/{id}")
+
 async def get_invoice(id: str, current_user: User = Depends(get_current_user)):
     doc = await db.invoices.find_one({"id": id, "user_id": current_user.id}, {"_id": 0})
     if not doc: 
@@ -2513,6 +2810,7 @@ async def delete_invoice(id: str, current_user: User = Depends(get_current_user)
     await db.invoices.delete_one({"id": id})
     await log_action(current_user.id, "delete", "invoice", f"Deleted invoice ID: {id}", id)
     return {"status": "deleted"}
+
 
 # ==================== CSV IMPORT ROUTES ====================
 
@@ -2861,6 +3159,7 @@ async def import_csv(
     except Exception as e:
         logging.error(f"Error processing CSV: {e}")
         raise HTTPException(status_code=400, detail=f"Error processing CSV: {str(e)}")
+
 
 # ==================== REPORTS ROUTES ====================
 

@@ -6,7 +6,7 @@ import {
   FileText, Plus, Search, Download, MoreVertical, Edit,
   Trash2, Send, CreditCard, Eye, Filter, ArrowUpRight,
   TrendingUp, Clock, AlertCircle, CheckCircle2, Zap, ArrowRight,
-  LayoutGrid, List, ChevronRight, X, Globe, PenLine
+  LayoutGrid, List, ChevronRight, X, Globe, PenLine, Upload
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,9 +118,43 @@ const Invoices = () => {
                     <h1 className="text-2xl font-black text-slate-900 tracking-tight">Invoice Management</h1>
                     <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">Financial Operations Control</p>
                 </div>
-                <Button onClick={() => navigate('/invoices/new')} className="h-9 px-5 bg-slate-900 text-white font-bold rounded-lg shadow-lg shadow-slate-200">
-                    <Plus className="h-4 w-4 mr-2" /> New Invoice
-                </Button>
+                <div className="flex items-center gap-3">
+                    <input 
+                        type="file" 
+                        id="bulk-import-invoices" 
+                        className="hidden" 
+                        accept=".xlsx,.xls,.csv" 
+                        onChange={async (e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            const toastId = toast.loading(`Importing ${file.name}...`);
+                            try {
+                                const res = await api.post('/invoices/import', formData, {
+                                    headers: { 'Content-Type': 'multipart/form-data' }
+                                });
+                                toast.success(res.data.message, { id: toastId });
+                                fetchInvoices();
+                            } catch (err) {
+                                toast.error(err.response?.data?.detail || 'Import failed', { id: toastId });
+                            } finally {
+                                e.target.value = '';
+                            }
+                        }}
+                    />
+                    <Button 
+                        variant="outline" 
+                        onClick={() => document.getElementById('bulk-import-invoices').click()}
+                        className="h-9 px-4 rounded-lg text-[13px] font-bold border-slate-200 hover:bg-slate-50 flex items-center gap-2"
+                    >
+                        <Upload className="h-4 w-4 text-slate-400" />
+                        Bulk Import
+                    </Button>
+                    <Button onClick={() => navigate('/invoices/new')} className="h-9 px-5 bg-slate-900 text-white font-bold rounded-lg shadow-lg shadow-slate-200">
+                        <Plus className="h-4 w-4 mr-2" /> New Invoice
+                    </Button>
+                </div>
             </div>
 
             {/* Compact Metrics */}

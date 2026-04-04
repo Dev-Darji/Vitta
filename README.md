@@ -75,6 +75,7 @@ Vitta is a powerful accounting and financial automation platform designed specif
    uvicorn server:app --reload
    ```
 
+   python -m uvicorn server:app --port 8000
 3. **Frontend Setup**
    ```bash
    cd ../frontend
