@@ -58,6 +58,19 @@ const TAB_META = [
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+const detectDateFormat = (rows, headers) => {
+  const dateIdx = headers.findIndex(h => String(h || '').toLowerCase().includes('date'));
+  if (dateIdx === -1) return 'DD-MM-YYYY';
+  for (const row of rows) {
+    const val = String(row[dateIdx] || '').trim();
+    const match = val.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+    if (match) {
+      if (parseInt(match[1]) > 12) return 'DD-MM-YYYY';
+      if (parseInt(match[2]) > 12) return 'MM-DD-YYYY';
+    }
+  }
+  return 'DD-MM-YYYY';
+};
 const parseCSV = (text) => {
   const result = [];
   let row = [], current = '', inQuotes = false;
@@ -78,9 +91,10 @@ const parseCSV = (text) => {
   if (current || row.length > 0) { row.push(current.trim()); result.push(row); }
   if (result.length < 1) return { headers: [], rows: [] };
   const headers = result[0];
+  const detectedFormat = detectDateFormat(result.slice(1), headers);
   const rows = result.slice(1).filter(r => r.some(v => v)).map(row => {
     const dateIdx = headers.findIndex(h => h.toLowerCase().includes('date'));
-    if (dateIdx !== -1 && row[dateIdx]) row[dateIdx] = normalizeDate(row[dateIdx]);
+    if (dateIdx !== -1 && row[dateIdx]) row[dateIdx] = normalizeDate(row[dateIdx], detectedFormat);
     return row;
   });
   return { headers, rows };
@@ -94,13 +108,14 @@ const parseExcel = async (file) => {
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
     if (jsonData.length === 0) return { headers: [], rows: [] };
     const headers = jsonData[0].map(h => String(h || ''));
+    const detectedFormat = detectDateFormat(jsonData.slice(1), headers);
     const rows = jsonData.slice(1).filter(r => r && r.length > 0 && r.some(v => v !== null && v !== '')).map(row => {
       const dateIdx = headers.findIndex(h => h.toLowerCase().includes('date'));
       if (dateIdx !== -1 && row[dateIdx]) {
         if (typeof row[dateIdx] === 'number') {
           const date = new Date((row[dateIdx] - 25569) * 86400 * 1000);
           row[dateIdx] = `${String(date.getDate()).padStart(2,'0')}-${String(date.getMonth()+1).padStart(2,'0')}-${date.getFullYear()}`;
-        } else row[dateIdx] = normalizeDate(String(row[dateIdx]));
+        } else row[dateIdx] = normalizeDate(String(row[dateIdx]), detectedFormat);
       }
       return row;
     });
@@ -108,7 +123,7 @@ const parseExcel = async (file) => {
   } catch (err) { console.error('Excel parse error:', err); throw new Error('Failed to parse Excel file'); }
 };
 
-const normalizeDate = (dateStr) => {
+const normalizeDate = (dateStr, format = 'DD-MM-YYYY') => {
   if (!dateStr) return dateStr;
   const str = String(dateStr).trim();
   if (!str) return str;
@@ -123,6 +138,11 @@ const normalizeDate = (dateStr) => {
     if (p1 > 1000) return `${String(p3).padStart(2,'0')}-${String(p2).padStart(2,'0')}-${p1}`;
     if (p3 > 1000) {
       if (p2 > 12) return `${String(p2).padStart(2,'0')}-${String(p1).padStart(2,'0')}-${p3}`;
+      if (p1 > 12) return `${String(p1).padStart(2,'0')}-${String(p2).padStart(2,'0')}-${p3}`;
+      
+      if (format === 'MM-DD-YYYY') {
+        return `${String(p2).padStart(2,'0')}-${String(p1).padStart(2,'0')}-${p3}`;
+      }
       return `${String(p1).padStart(2,'0')}-${String(p2).padStart(2,'0')}-${p3}`;
     }
   }
