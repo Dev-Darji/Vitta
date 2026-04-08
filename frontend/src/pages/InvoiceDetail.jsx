@@ -321,7 +321,7 @@ const InvoiceDetail = () => {
                             <tbody className="divide-y divide-slate-50">
                                 {invoice.items.map((item, i) => (
                                     <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="py-5 text-[11px] font-bold text-slate-300">{String(i+1).zfill(2)}</td>
+                                        <td className="py-5 text-[11px] font-bold text-slate-300">{String(i + 1).padStart(2, '0')}</td>
                                         <td className="py-5">
                                             <p className="text-xs font-black text-slate-900 mb-0.5">{item.name}</p>
                                             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-tighter">{item.tax_rate}% TAX APPLIED</p>

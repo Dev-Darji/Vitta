@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import ConfirmPopup from '@/components/ConfirmPopup';
 
 /* ─── Font ─────────────────────────────────────────────────────────────── */
 const FontStyle = () => (
@@ -114,6 +115,8 @@ const Categories = () => {
   const [submitting, setSubmitting] = useState(false);
   const [newCategory, setNewCategory] = useState({ name: '', type: 'expense', color: '#6366f1', schedule_iii_head: 'Other Expenses' });
   const [editingCategory, setEditingCategory] = useState(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [categoryIdToDelete, setCategoryIdToDelete] = useState(null);
 
   useEffect(() => { fetchCategories(); }, []);
 
@@ -153,10 +156,22 @@ const Categories = () => {
     finally { setSubmitting(false); }
   };
 
-  const handleDeleteCategory = async (id) => {
-    if (!window.confirm('Delete this category?')) return;
-    try { await api.delete(`/categories/${id}`); toast.success('Category deleted'); fetchCategories(); }
-    catch { toast.error('Failed to delete category'); }
+  const handleDeleteCategory = (id) => {
+    setCategoryIdToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await api.delete(`/categories/${categoryIdToDelete}`);
+      toast.success('Category deleted');
+      fetchCategories();
+    } catch {
+      toast.error('Failed to delete category');
+    } finally {
+      setDeleteConfirmOpen(false);
+      setCategoryIdToDelete(null);
+    }
   };
 
   const openEdit = (cat) => {
@@ -385,6 +400,17 @@ const Categories = () => {
           </div>
         </>
       )}
+
+      {/* ══ DELETE CONFIRM ══ */}
+      <ConfirmPopup
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={confirmDelete}
+        title="Delete Category"
+        description="Are you sure you want to delete this category? All associated data classification will be removed. This action cannot be undone."
+        confirmText="Yes, Delete Category"
+        cancelText="Keep Category"
+      />
     </div>
   );
 };

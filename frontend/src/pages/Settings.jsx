@@ -438,17 +438,28 @@ const Settings = () => {
                              </div>
                              <div className="grid grid-cols-2 gap-4 pt-2">
                                 <div className="space-y-1.5">
-                                  <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phone</Label>
+                                  <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Website</Label>
                                   <div className="relative">
-                                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
-                                    <Input value={companyProfile.phone} onChange={e => setCompanyProfile({...companyProfile, phone: e.target.value})} className="h-11 rounded-xl border-slate-100 bg-slate-50 font-bold text-[13px] pl-9" />
+                                    <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
+                                    <Input value={companyProfile.website} onChange={e => setCompanyProfile({...companyProfile, website: e.target.value})} placeholder="www.sharmadigital.in" className="h-11 rounded-xl border-slate-100 bg-slate-50 font-bold text-[12px] pl-9" />
                                   </div>
                                 </div>
-                                <div className="space-y-1.5">
-                                  <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email</Label>
-                                  <div className="relative">
-                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
-                                    <Input value={companyProfile.email} onChange={e => setCompanyProfile({...companyProfile, email: e.target.value})} className="h-11 rounded-xl border-slate-100 bg-slate-50 font-bold text-[12px] pl-9" />
+                                <div className="space-y-1.5 pt-2 md:pt-0">
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                      <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phone</Label>
+                                      <div className="relative">
+                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
+                                        <Input value={companyProfile.phone} onChange={e => setCompanyProfile({...companyProfile, phone: e.target.value})} className="h-11 rounded-xl border-slate-100 bg-slate-50 font-bold text-[13px] pl-9" />
+                                      </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email</Label>
+                                      <div className="relative">
+                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
+                                        <Input value={companyProfile.email} onChange={e => setCompanyProfile({...companyProfile, email: e.target.value})} className="h-11 rounded-xl border-slate-100 bg-slate-50 font-bold text-[12px] pl-9" />
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
                              </div>
@@ -480,6 +491,10 @@ const Settings = () => {
                            <div className="space-y-2">
                               <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">IFSC Code</Label>
                               <Input value={companyProfile.ifsc_code} onChange={e => setCompanyProfile({...companyProfile, ifsc_code: e.target.value.toUpperCase()})} placeholder="HDFC000..." className="h-11 rounded-xl border-slate-100 bg-white font-black text-[13px] uppercase" />
+                           </div>
+                           <div className="space-y-2">
+                              <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Branch</Label>
+                              <Input value={companyProfile.branch} onChange={e => setCompanyProfile({...companyProfile, branch: e.target.value})} placeholder="Bopal, Ahmedabad" className="h-11 rounded-xl border-slate-100 bg-white font-bold text-[13px]" />
                            </div>
                            <div className="space-y-2">
                               <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Fiscal Year Start</Label>

@@ -29,16 +29,17 @@ const FontStyle = () => (
 /* ─── Nav Items ─────────────────────────────────────────────────────────── */
 const menuItemsRaw = [
   { path: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard',        testId: 'menu-dashboard', feature: 'dashboard' },
-  { path: '/clients',      icon: Building2,       label: 'Clients',          testId: 'menu-clients',   feature: 'clients' },
-  { path: '/accounts',     icon: Wallet,           label: 'Accounts',         testId: 'menu-accounts',  feature: 'accounts' },
-  { path: '/transactions', icon: CreditCard,       label: 'Transactions',     testId: 'menu-transactions', feature: 'transactions' },
-  { path: '/invoices',     icon: FileText,         label: 'Invoices',         testId: 'menu-invoices',     feature: 'invoices' },
-  { path: '/items',        icon: ShoppingBag,      label: 'Items and SAC',      testId: 'menu-items',        feature: 'invoices' },
-  { path: '/reports',      icon: BarChart3,        label: 'Reports',          testId: 'menu-reports',      feature: 'reports' },
-  { path: '/categories',   icon: Tag,              label: 'Categories',       testId: 'menu-categories',   feature: 'settings' },
-  { path: '/automation',   icon: Zap,              label: 'Automation',       testId: 'menu-automation',   feature: 'automation' },
+  { path: '/accounts',     icon: Wallet,           label: 'Accounts',         testId: 'menu-accounts',  feature: 'accounts' }, // Step 3
+  { path: '/categories',   icon: Tag,              label: 'Categories',       testId: 'menu-categories',   feature: 'settings' }, // Step 4
+  { path: '/clients',      icon: Building2,       label: 'Clients',          testId: 'menu-clients',   feature: 'clients' },   // Step 5
+  { path: '/items',        icon: ShoppingBag,      label: 'Items and SAC',      testId: 'menu-items',        feature: 'invoices' },  // Step 6
+  { path: '/invoices',     icon: Receipt,         label: 'Invoices',         testId: 'menu-invoices',     feature: 'invoices' },  // Step 7 & 8
+  { path: '/import',       icon: PlusCircle,      label: 'Add Transactions', testId: 'menu-import',       feature: 'transactions' }, // Step 9
+  { path: '/transactions', icon: CreditCard,       label: 'View Transactions',testId: 'menu-transactions', feature: 'transactions' },
+  { path: '/automation',   icon: Zap,              label: 'Automation',       testId: 'menu-automation',   feature: 'automation' }, // Step 10
+  { path: '/reports',      icon: BarChart3,        label: 'Reports',          testId: 'menu-reports',      feature: 'reports' },    // Step 12
   { path: '/audit',        icon: History,          label: 'Audit Trials',      testId: 'menu-audit',        feature: 'audit_trail' },
-  { path: '/settings',     icon: Settings,         label: 'Settings',         testId: 'menu-settings',     feature: 'settings' },
+  { path: '/settings',     icon: Settings,         label: 'Settings',         testId: 'menu-settings',     feature: 'settings' }, // Step 2
 ];
 
 /* ═══════════════════════════════════════════════════════════════════════════
